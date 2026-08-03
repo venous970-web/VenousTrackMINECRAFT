@@ -46,11 +46,12 @@ def load_servers():
         except Exception:
             pass
     default_servers = [
-        "mc.coralmc.it",
+        "venous.coralmc.it",
         "play.metamc.it",
         "play.tecnocraft.net",
-        "play.fruitmc.it",
+        "hypixel.net",
         "play.scarletmc.it"
+        "donutsmp.net"
     ]
     save_servers(default_servers)
     return default_servers

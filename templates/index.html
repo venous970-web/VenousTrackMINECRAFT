@@ -197,6 +197,25 @@
             height: 120px;
             position: relative;
         }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            transition: 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: #ef4444;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -258,6 +277,7 @@
                     card.id = `card-${safeIpId}`;
                     card.className = 'server-card';
                     card.innerHTML = `
+                        <button class="btn-delete" onclick="deleteServer('${server.ip}')">🗑️ Elimina</button>
                         <div class="server-info">
                             <div class="rank-num" id="rank-${safeIpId}">#${index + 1}</div>
                             <img class="server-icon" id="icon-${safeIpId}" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
@@ -281,7 +301,7 @@
                     `;
                     container.appendChild(card);
                 } else {
-                    // SE LA CARD ESISTE GIÀ: Aggiorniamo solo i singoli testi
+                    // SE LA CARD ESISTE GIÀ: Aggiorniamo solo i singoli testi SENZA piallare il canvas
                     document.getElementById(`rank-${safeIpId}`).innerText = `#${index + 1}`;
                     document.getElementById(`players-${safeIpId}`).innerText = server.players.toLocaleString('it-IT');
                     document.getElementById(`peak-${safeIpId}`).innerText = server.peak_72h;
@@ -300,14 +320,15 @@
                         icon.src = server.favicon;
                     }
 
+                    // Riordina la card nel DOM se la posizione in classifica è cambiata
                     container.appendChild(card);
                 }
 
-                // AGGIORNAMENTO O CREAZIONE DEL GRAFICO
+                // AGGIORNAMENTO O CREAZIONE DEL GRAFICO (Senza pallini, con orario HH:mm:ss)
                 if (charts[safeIpId]) {
                     charts[safeIpId].data.labels = server.chart_labels;
                     charts[safeIpId].data.datasets[0].data = server.chart_data;
-                    charts[safeIpId].update('none');
+                    charts[safeIpId].update('none'); // Aggiornamento istantaneo e fluido
                 } else {
                     const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
                     charts[safeIpId] = new Chart(ctx, {
@@ -321,9 +342,9 @@
                                 borderWidth: 2,
                                 fill: true,
                                 tension: 0.35,
-                                pointRadius: 0,
-                                pointHoverRadius: 6,
-                                pointHitRadius: 20,
+                                pointRadius: 0,           // Nessun pallino di default
+                                pointHoverRadius: 6,      // Pallino visibile solo al passaggio/touch
+                                pointHitRadius: 20,       // Facile da toccare da telefono
                                 pointBackgroundColor: '#eab308'
                             }]
                         },
@@ -339,7 +360,7 @@
                                     displayColors: false,
                                     callbacks: {
                                         title: function(context) {
-                                            return 'Ora: ' + context[0].label;
+                                            return 'Ora: ' + context[0].label; // HH:mm:ss
                                         },
                                         label: function(context) {
                                             return 'Giocatori: ' + context.raw.toLocaleString('it-IT');
@@ -371,6 +392,19 @@
                 body: JSON.stringify({ ip: ip })
             });
             input.value = '';
+            fetchStats();
+        }
+
+        async function deleteServer(ip) {
+            await fetch('/api/servers', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: ip })
+            });
+            const safeIpId = ip.replace(/[^a-zA-Z0-9]/g, '_');
+            const card = document.getElementById(`card-${safeIpId}`);
+            if (card) card.remove();
+            delete charts[safeIpId];
             fetchStats();
         }
 

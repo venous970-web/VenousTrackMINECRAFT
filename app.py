@@ -18,7 +18,7 @@ CONFIG_FILE = "servers.json"
 
 SERVER_STATES = {}
 MAX_FAILS = 3
-PING_INTERVAL = 5  # Intervallo del ping in secondi
+PING_INTERVAL = 5
 ITALY_TZ = ZoneInfo("Europe/Rome")
 
 def init_db():
@@ -62,7 +62,6 @@ def save_servers(servers):
 servers_list = load_servers()
 
 def query_minecraft_server(ip):
-    """ Pinga un singolo server gestendo il timeout in fase di inizializzazione """
     if ":" in ip:
         try:
             host, port_str = ip.split(":", 1)
@@ -91,7 +90,6 @@ def query_minecraft_server(ip):
             return None, f"SRV fallito ({e_srv}) | Diretto fallito ({e_dir})"
 
 def background_tracker():
-    """ Thread in background che esegue il ping SIMULTANEO di tutti i server """
     while True:
         now_ts = int(time.time())
         current_servers = list(servers_list)
@@ -232,8 +230,17 @@ def get_server_analytics(ip, current_players):
 def index():
     return render_template("index.html")
 
-@app.route("/api/servers", methods=["GET"])
+@app.route("/api/servers", methods=["GET", "POST"])
 def handle_servers():
+    global servers_list
+    if request.method == "POST":
+        data = request.json
+        ip = data.get("ip", "").strip()
+        if ip and ip not in servers_list:
+            servers_list.append(ip)
+            save_servers(servers_list)
+            return jsonify({"status": "success", "servers": servers_list})
+        return jsonify({"status": "error", "message": "IP non valido o già presente"}), 400
     return jsonify(servers_list)
 
 @app.route("/api/stats", methods=["GET"])

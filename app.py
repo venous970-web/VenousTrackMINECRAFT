@@ -159,7 +159,12 @@ def get_server_analytics(ip, current_players):
         target_ts = now_ts - seconds_ago
         c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1", (ip, target_ts))
         r = c.fetchone()
-        return f"{r[0]:,}".replace(",", ".") if r and r[0] is not None else "-"
+        if r and r[0] is not None:
+            try:
+                return f"{int(r[0]):,}".replace(",", ".")
+            except ValueError:
+                return str(r[0])
+        return "-"
         
     p_1d = get_past_players(86400)
     p_2d = get_past_players(2 * 86400)
@@ -178,9 +183,12 @@ def get_server_analytics(ip, current_players):
         chart_labels = ["--:--:--", now_str]
         chart_data = [current_players, current_players]
         
+    peak_72h_str = f"{int(peak_72h):,}".replace(",", ".") if peak_72h is not None else "0"
+    record_str = f"{int(rec_players):,} ({rec_date})".replace(",", ".") if rec_players is not None else f"0 ({rec_date})"
+
     return {
-        "peak_72h": f"{peak_72h:,}".replace(",", "."),
-        "record": f"{rec_players:,} ({rec_date})".replace(",", "."),
+        "peak_72h": peak_72h_str,
+        "record": record_str,
         "day_1": p_1d,
         "day_2": p_2d,
         "day_3": p_3d,

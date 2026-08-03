@@ -3,82 +3,242 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VenousTrack</title>
+    <title>Venous Track</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-        body { background-color: #121212; color: #e4e4e7; min-height: 100vh; padding: 12px; }
-        
-        .header { display: flex; justify-content: space-between; align-items: center; max-width: 900px; margin: 0 auto 16px auto; flex-wrap: wrap; gap: 12px; }
-        .logo-title { font-size: 1.4rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; }
-        .logo-title span { color: #facc15; }
-        
-        .add-box { display: flex; gap: 8px; background: #1e1e1e; padding: 6px; border-radius: 8px; border: 1px solid #2d2d2d; width: 100%; max-width: 360px; }
-        .add-box input { background: transparent; border: none; color: #fff; padding: 6px 10px; outline: none; font-size: 0.85rem; flex: 1; width: 100%; }
-        .add-box button { background: #facc15; color: #000; border: none; padding: 6px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: 0.2s; white-space: nowrap; }
-        .add-box button:hover { background: #eab308; }
-
-        .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-        
-        .server-row {
-            background-color: #1a1a1a;
-            border: 1px solid #262626;
-            padding: 12px 14px;
-            display: grid;
-            grid-template-columns: 44px 1fr 240px;
-            gap: 12px;
-            align-items: center;
-            border-radius: 8px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .left-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-        .server-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: #262626; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #71717a; }
-        .rank-num { font-size: 0.8rem; font-weight: 700; color: #a1a1aa; }
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+        }
 
-        .info-col { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: #a1a1aa; min-width: 0; }
-        .server-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; flex-wrap: wrap; }
-        .star-icon { color: #facc15; font-size: 0.85rem; flex-shrink: 0; }
-        .server-name { color: #ffffff; font-weight: 700; font-size: 0.95rem; word-break: break-all; }
-        
-        .status-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
-        .status-online { background: #166534; color: #4ade80; }
-        .status-offline { background: #991b1b; color: #fca5a5; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1100px;
+            margin: 0 auto 20px auto;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
 
-        .stat-bold { color: #ffffff; font-weight: 700; }
-        .version-tag { color: #71717a; margin-top: 1px; font-size: 0.75rem; }
+        .title-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-        .chart-col { height: 85px; position: relative; width: 100%; }
+        .site-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #252525;
+        }
 
-        @media (max-width: 650px) {
-            .server-row {
-                grid-template-columns: 40px 1fr;
-                gap: 10px;
-                padding: 10px 12px;
+        .title-container h1 {
+            font-size: 28px;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .add-form {
+            display: flex;
+            gap: 10px;
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .add-form input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            outline: none;
+            width: 240px;
+        }
+
+        .add-form button {
+            background: #eab308;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .add-form button:hover {
+            background: #ca8a04;
+        }
+
+        .live-badge {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        .server-list {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .server-card {
+            background: #181818;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .server-card {
+                flex-direction: column;
+                align-items: flex-start;
             }
-            .chart-col {
-                grid-column: span 2;
-                height: 90px;
-                margin-top: 4px;
+            .chart-box {
+                width: 100% !important;
             }
+        }
+
+        .server-info {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .rank-num {
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: #252525;
+            object-fit: cover;
+        }
+
+        .server-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .server-header-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .status-badge.online {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-badge.offline {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .stat-line {
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .stat-line span {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .chart-box {
+            width: 320px;
+            height: 120px;
+            position: relative;
         }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div class="logo-title">Venous<span>Track</span></div>
-        <div class="add-box">
+        <div class="title-container">
+            <img src="/static/head.png" alt="Head" class="site-avatar" onerror="this.style.display='none'">
+            <h1>Venous Track</h1>
+        </div>
+        
+        <div class="add-form">
             <input type="text" id="newIp" placeholder="IP Server (es. play.coralmc.it)">
             <button onclick="addServer()">Aggiungi</button>
         </div>
+
+        <div class="live-badge">
+            <div class="live-dot"></div>
+            <span>Live: <strong id="clock">00:00:00</strong></span>
+        </div>
     </div>
 
-    <div class="container" id="serverContainer"></div>
+    <div class="server-list" id="serverContainer">
+        <!-- I server verranno caricati qui dinamicamente -->
+    </div>
 
     <script>
         const charts = {};
-        const chartDataMap = {};
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
 
         async function fetchStats() {
             try {
@@ -93,123 +253,124 @@
         function renderServers(servers) {
             const container = document.getElementById('serverContainer');
 
-            servers.forEach((s, index) => {
-                let row = document.getElementById('row-' + s.ip);
-                const formattedPlayers = new Intl.NumberFormat('it-IT').format(s.players);
-                
-                const statusBadgeHtml = s.online 
-                    ? '<span class="status-badge status-online">ONLINE</span>' 
-                    : '<span class="status-badge status-offline">OFFLINE</span>';
+            servers.forEach((server, index) => {
+                const safeIpId = server.ip.replace(/[^a-zA-Z0-9]/g, '_');
+                let card = document.getElementById(`card-${safeIpId}`);
 
-                if (!row) {
-                    row = document.createElement('div');
-                    row.className = 'server-row';
-                    row.id = 'row-' + s.ip;
+                const faviconSrc = server.favicon || '/static/head.png';
+                const statusClass = server.online ? 'online' : 'offline';
+                const statusText = server.online ? 'ONLINE' : 'OFFLINE';
 
-                    row.innerHTML = `
-                        <div class="left-col">
-                            ${s.favicon ? `<img class="server-icon" id="icon-${s.ip}" src="${s.favicon}" alt="icon">` : `<div class="server-icon" id="icon-${s.ip}">🌐</div>`}
-                            <div class="rank-num" id="rank-${s.ip}">#${index + 1}</div>
-                        </div>
-                        <div class="info-col">
-                            <div class="server-title-row">
-                                <span class="star-icon">☆</span>
-                                <span class="server-name" id="name-${s.ip}">${s.ip}</span>
-                                <span id="status-${s.ip}">${statusBadgeHtml}</span>
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${safeIpId}`;
+                    card.className = 'server-card';
+                    card.innerHTML = `
+                        <div class="server-info">
+                            <div class="rank-num" id="rank-${safeIpId}">#${index + 1}</div>
+                            <img class="server-icon" id="icon-${safeIpId}" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
+                            <div class="server-details">
+                                <div class="server-header-line">
+                                    <span class="server-name">${server.ip}</span>
+                                    <span class="status-badge ${statusClass}" id="status-${safeIpId}">${statusText}</span>
+                                </div>
+                                <div class="stat-line">Players: <span id="players-${safeIpId}">${server.players.toLocaleString('it-IT')}</span></div>
+                                <div class="stat-line">72h Peak: <span id="peak-${safeIpId}">${server.peak_72h}</span></div>
+                                <div class="stat-line">Record: <span id="record-${safeIpId}">${server.record}</span></div>
+                                <div class="stat-line">1 Day Ago: <span id="d1-${safeIpId}">${server.day_1}</span></div>
+                                <div class="stat-line">2 Days Ago: <span id="d2-${safeIpId}">${server.day_2}</span></div>
+                                <div class="stat-line">3 Days Ago: <span id="d3-${safeIpId}">${server.day_3}</span></div>
+                                <div class="stat-line" id="ver-${safeIpId}" style="font-size:11px; margin-top:4px; color:#777;">${server.version}</div>
                             </div>
-                            <div>Players: <span class="stat-bold" id="players-${s.ip}">${formattedPlayers}</span></div>
-                            <div>72h Peak: <span id="peak-${s.ip}">${s.peak_72h}</span></div>
-                            <div>Record: <span id="record-${s.ip}">${s.record}</span></div>
-                            <div>1 Day Ago: <span id="d1-${s.ip}">${s.day_1}</span></div>
-                            <div>2 Days Ago: <span id="d2-${s.ip}">${s.day_2}</span></div>
-                            <div>3 Days Ago: <span id="d3-${s.ip}">${s.day_3}</span></div>
-                            <div class="version-tag" id="ver-${s.ip}">${s.version}</div>
                         </div>
-                        <div class="chart-col">
-                            <canvas id="chart-${s.ip}"></canvas>
+                        <div class="chart-box">
+                            <canvas id="chart-${safeIpId}"></canvas>
                         </div>
                     `;
-                    container.appendChild(row);
-                    initChart(s.ip, s.chart_labels, s.chart_data);
+                    container.appendChild(card);
                 } else {
-                    document.getElementById('rank-' + s.ip).innerText = '#' + (index + 1);
-                    document.getElementById('players-' + s.ip).innerText = formattedPlayers;
-                    document.getElementById('peak-' + s.ip).innerText = s.peak_72h;
-                    document.getElementById('record-' + s.ip).innerText = s.record;
-                    document.getElementById('d1-' + s.ip).innerText = s.day_1;
-                    document.getElementById('d2-' + s.ip).innerText = s.day_2;
-                    document.getElementById('d3-' + s.ip).innerText = s.day_3;
-                    document.getElementById('ver-' + s.ip).innerText = s.version;
-                    document.getElementById('status-' + s.ip).innerHTML = statusBadgeHtml;
-                    
-                    const iconContainer = document.getElementById('icon-' + s.ip);
-                    if (s.favicon) {
-                        if (iconContainer.tagName === 'IMG') {
-                            iconContainer.src = s.favicon;
-                        } else {
-                            const newImg = document.createElement('img');
-                            newImg.className = 'server-icon';
-                            newImg.id = 'icon-' + s.ip;
-                            newImg.src = s.favicon;
-                            iconContainer.replaceWith(newImg);
-                        }
+                    document.getElementById(`rank-${safeIpId}`).innerText = `#${index + 1}`;
+                    document.getElementById(`players-${safeIpId}`).innerText = server.players.toLocaleString('it-IT');
+                    document.getElementById(`peak-${safeIpId}`).innerText = server.peak_72h;
+                    document.getElementById(`record-${safeIpId}`).innerText = server.record;
+                    document.getElementById(`d1-${safeIpId}`).innerText = server.day_1;
+                    document.getElementById(`d2-${safeIpId}`).innerText = server.day_2;
+                    document.getElementById(`d3-${safeIpId}`).innerText = server.day_3;
+                    document.getElementById(`ver-${safeIpId}`).innerText = server.version;
+
+                    const statusBadge = document.getElementById(`status-${safeIpId}`);
+                    statusBadge.className = `status-badge ${statusClass}`;
+                    statusBadge.innerText = statusText;
+
+                    const icon = document.getElementById(`icon-${safeIpId}`);
+                    if (server.favicon && icon.src !== server.favicon) {
+                        icon.src = server.favicon;
                     }
-                    updateChart(s.ip, s.chart_labels, s.chart_data);
+
+                    container.appendChild(card);
                 }
 
-                container.appendChild(row);
-            });
-        }
-
-        function initChart(ip, labels, data) {
-            const ctx = document.getElementById('chart-' + ip).getContext('2d');
-            chartDataMap[ip] = { labels: labels, datasets: [{ label: 'Players', data: data, borderColor: '#facc15', borderWidth: 2, pointRadius: 2, pointHoverRadius: 6, tension: 0.25 }] };
-
-            charts[ip] = new Chart(ctx, {
-                type: 'line',
-                data: chartDataMap[ip],
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            enabled: true,
-                            mode: 'index',
-                            intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    return ' Players: ' + context.parsed.y;
+                if (charts[safeIpId]) {
+                    charts[safeIpId].data.labels = server.chart_labels;
+                    charts[safeIpId].data.datasets[0].data = server.chart_data;
+                    charts[safeIpId].update('none');
+                } else {
+                    const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
+                    charts[safeIpId] = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: server.chart_labels,
+                            datasets: [{
+                                data: server.chart_data,
+                                borderColor: '#eab308',
+                                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: 0,
+                                pointHoverRadius: 6,
+                                pointHitRadius: 20,
+                                pointBackgroundColor: '#eab308'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    enabled: true,
+                                    mode: 'index',
+                                    intersect: false,
+                                    displayColors: false,
+                                    callbacks: {
+                                        title: function(context) {
+                                            return 'Ora: ' + context[0].label;
+                                        },
+                                        label: function(context) {
+                                            return 'Giocatori: ' + context.raw.toLocaleString('it-IT');
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: { color: '#666', font: { size: 10 } }
                                 }
                             }
                         }
-                    },
-                    scales: {
-                        x: { display: false },
-                        y: {
-                            grid: { color: '#262626' },
-                            ticks: { color: '#a1a1aa', font: { size: 10 }, precision: 0 }
-                        }
-                    }
+                    });
                 }
             });
-        }
-
-        function updateChart(ip, labels, data) {
-            if (!charts[ip]) return;
-            charts[ip].data.labels = labels;
-            charts[ip].data.datasets[0].data = data;
-            charts[ip].update('none');
         }
 
         async function addServer() {
             const input = document.getElementById('newIp');
             const ip = input.value.trim();
             if (!ip) return;
+
             await fetch('/api/servers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

@@ -33,7 +33,7 @@
         }
 
         .left-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-        .server-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: #262626; flex-shrink: 0; }
+        .server-icon { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; background: #262626; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #71717a; }
         .rank-num { font-size: 0.8rem; font-weight: 700; color: #a1a1aa; }
 
         .info-col { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: #a1a1aa; min-width: 0; }
@@ -67,7 +67,7 @@
 <body>
 
     <div class="header">
-        <div class="logo-title">⚡ Venous<span>Track</span></div>
+        <div class="logo-title">Venous<span>Track</span></div>
         <div class="add-box">
             <input type="text" id="newIp" placeholder="IP Server (es. play.coralmc.it)">
             <button onclick="addServer()">Aggiungi</button>
@@ -96,8 +96,6 @@
             servers.forEach((s, index) => {
                 let row = document.getElementById('row-' + s.ip);
                 const formattedPlayers = new Intl.NumberFormat('it-IT').format(s.players);
-                const defaultIcon = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAMUlEQVRYR+3QQREAAAgDMIp/a23s4AEXS8S2vYmAAgQIECBAgAABAgQIECBAgAABAgRWB56iB3F5Jv9CAAAAAElFTkSuQmCC';
-                const iconSrc = s.favicon ? s.favicon : defaultIcon;
                 
                 const statusBadgeHtml = s.online 
                     ? '<span class="status-badge status-online">ONLINE</span>' 
@@ -110,7 +108,7 @@
 
                     row.innerHTML = `
                         <div class="left-col">
-                            <img class="server-icon" id="icon-${s.ip}" src="${iconSrc}" alt="icon">
+                            ${s.favicon ? `<img class="server-icon" id="icon-${s.ip}" src="${s.favicon}" alt="icon">` : `<div class="server-icon" id="icon-${s.ip}">🌐</div>`}
                             <div class="rank-num" id="rank-${s.ip}">#${index + 1}</div>
                         </div>
                         <div class="info-col">
@@ -143,8 +141,18 @@
                     document.getElementById('d3-' + s.ip).innerText = s.day_3;
                     document.getElementById('ver-' + s.ip).innerText = s.version;
                     document.getElementById('status-' + s.ip).innerHTML = statusBadgeHtml;
+                    
+                    const iconContainer = document.getElementById('icon-' + s.ip);
                     if (s.favicon) {
-                        document.getElementById('icon-' + s.ip).src = s.favicon;
+                        if (iconContainer.tagName === 'IMG') {
+                            iconContainer.src = s.favicon;
+                        } else {
+                            const newImg = document.createElement('img');
+                            newImg.className = 'server-icon';
+                            newImg.id = 'icon-' + s.ip;
+                            newImg.src = s.favicon;
+                            iconContainer.replaceWith(newImg);
+                        }
                     }
                     updateChart(s.ip, s.chart_labels, s.chart_data);
                 }
@@ -155,7 +163,7 @@
 
         function initChart(ip, labels, data) {
             const ctx = document.getElementById('chart-' + ip).getContext('2d');
-            chartDataMap[ip] = { labels: labels, datasets: [{ label: 'Players', data: data, borderColor: '#facc15', borderWidth: 2, pointRadius: 0, tension: 0.25 }] };
+            chartDataMap[ip] = { labels: labels, datasets: [{ label: 'Players', data: data, borderColor: '#facc15', borderWidth: 2, pointRadius: 2, pointHoverRadius: 6, tension: 0.25 }] };
 
             charts[ip] = new Chart(ctx, {
                 type: 'line',
@@ -163,7 +171,23 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return ' Players: ' + context.parsed.y;
+                                }
+                            }
+                        }
+                    },
                     scales: {
                         x: { display: false },
                         y: {

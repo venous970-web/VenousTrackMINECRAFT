@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venous Track</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1100px;
+            margin: 0 auto 20px auto;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .title-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-container h1 {
+            font-size: 28px;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .add-form {
+            display: flex;
+            gap: 10px;
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .add-form input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 8px 12px;
+            outline: none;
+            width: 240px;
+        }
+
+        .add-form button {
+            background: #eab308;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .add-form button:hover {
+            background: #ca8a04;
+        }
+
+        .live-badge {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #22c55e;
+        }
+
+        .server-list {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .server-card {
+            background: #181818;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .server-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .chart-box {
+                width: 100% !important;
+            }
+        }
+
+        .server-info {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .rank-num {
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .server-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            background: #252525;
+            object-fit: cover;
+        }
+
+        .server-details {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .server-header-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .server-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .status-badge {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .status-badge.online {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-badge.offline {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .stat-line {
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .stat-line span {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .chart-box {
+            width: 320px;
+            height: 120px;
+            position: relative;
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            transition: 0.2s;
+        }
+
+        .btn-delete:hover {
+            background: #ef4444;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="title-container">
+            <h1>📊 Venous Track</h1>
+        </div>
+        
+        <div class="add-form">
+            <input type="text" id="newIp" placeholder="IP Server (es. play.coralmc.it)">
+            <button onclick="addServer()">Aggiungi</button>
+        </div>
+
+        <div class="live-badge">
+            <div class="live-dot"></div>
+            <span>Live: <strong id="clock">00:00:00</strong></span>
+        </div>
+    </div>
+
+    <div class="server-list" id="serverContainer">
+        <!-- I server verranno caricati qui dinamicamente -->
+    </div>
+
+    <script>
+        const charts = {};
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString();
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                renderServers(data);
+            } catch (err) {
+                console.error("Errore fetch stats:", err);
+            }
+        }
+
+        function renderServers(servers) {
+            const container = document.getElementById('serverContainer');
+
+            servers.forEach((server, index) => {
+                const safeIpId = server.ip.replace(/[^a-zA-Z0-9]/g, '_');
+                let card = document.getElementById(`card-${safeIpId}`);
+
+                // Se la card non esiste, la creiamo
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${safeIpId}`;
+                    card.className = 'server-card';
+                    container.appendChild(card);
+                }
+
+                const faviconSrc = server.favicon || '/static/head.png';
+                const statusClass = server.online ? 'online' : 'offline';
+                const statusText = server.online ? 'ONLINE' : 'OFFLINE';
+
+                // AGGIORNAMENTO DINAMICO DI TUTTI I TESTI
+                card.innerHTML = `
+                    <button class="btn-delete" onclick="deleteServer('${server.ip}')">🗑️ Elimina</button>
+                    <div class="server-info">
+                        <div class="rank-num">#${index + 1}</div>
+                        <img class="server-icon" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
+                        <div class="server-details">
+                            <div class="server-header-line">
+                                <span class="server-name">${server.ip}</span>
+                                <span class="status-badge ${statusClass}">${statusText}</span>
+                            </div>
+                            <div class="stat-line">Players: <span id="players-${safeIpId}">${server.players.toLocaleString('it-IT')}</span></div>
+                            <div class="stat-line">72h Peak: <span>${server.peak_72h}</span></div>
+                            <div class="stat-line">Record: <span>${server.record}</span></div>
+                            <div class="stat-line">1 Day Ago: <span>${server.day_1}</span></div>
+                            <div class="stat-line">2 Days Ago: <span>${server.day_2}</span></div>
+                            <div class="stat-line">3 Days Ago: <span>${server.day_3}</span></div>
+                            <div class="stat-line" style="font-size:11px; margin-top:4px; color:#777;">${server.version}</div>
+                        </div>
+                    </div>
+                    <div class="chart-box">
+                        <canvas id="chart-${safeIpId}"></canvas>
+                    </div>
+                `;
+
+                // AGGIORNAMENTO GRAFICO (Senza pallini, con orario HH:mm:ss)
+                const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
+                
+                if (charts[safeIpId]) {
+                    charts[safeIpId].data.labels = server.chart_labels;
+                    charts[safeIpId].data.datasets[0].data = server.chart_data;
+                    charts[safeIpId].update('none'); // Aggiornamento fluido senza sfarfallii
+                } else {
+                    charts[safeIpId] = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: server.chart_labels,
+                            datasets: [{
+                                data: server.chart_data,
+                                borderColor: '#eab308',
+                                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: 0,           // ZERO PALLINI DI DEFAULT
+                                pointHoverRadius: 6,      // PALLINO SOLO AL TOUCH / HOVER
+                                pointHitRadius: 20,       // FACILE DA TOCCARE DA MOBILE
+                                pointBackgroundColor: '#eab308'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    enabled: true,
+                                    mode: 'index',
+                                    intersect: false,
+                                    displayColors: false,
+                                    callbacks: {
+                                        title: function(context) {
+                                            return 'Ora: ' + context[0].label; // Mostra HH:mm:ss
+                                        },
+                                        label: function(context) {
+                                            return 'Giocatori: ' + context.raw.toLocaleString('it-IT');
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                                    ticks: { color: '#666', font: { size: 10 } }
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        async function addServer() {
+            const input = document.getElementById('newIp');
+            const ip = input.value.trim();
+            if (!ip) return;
+
+            await fetch('/api/servers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: ip })
+            });
+            input.value = '';
+            fetchStats();
+        }
+
+        async function deleteServer(ip) {
+            await fetch('/api/servers', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: ip })
+            });
+            const safeIpId = ip.replace(/[^a-zA-Z0-9]/g, '_');
+            const card = document.getElementById(`card-${safeIpId}`);
+            if (card) card.remove();
+            delete charts[safeIpId];
+            fetchStats();
+        }
+
+        // Fetch iniziale e aggiornamento ogni 5 secondi
+        fetchStats();
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>

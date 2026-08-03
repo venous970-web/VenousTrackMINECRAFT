@@ -61,7 +61,6 @@ servers_list = load_servers()
 
 def query_minecraft_server(ip):
     """ Pinga un singolo server gestendo il timeout in fase di inizializzazione """
-    # 1. IP con porta esplicita (es. 192.168.1.50:25565)
     if ":" in ip:
         try:
             host, port_str = ip.split(":", 1)
@@ -73,7 +72,6 @@ def query_minecraft_server(ip):
         except Exception as e:
             return None, f"Porta diretta: {e}"
 
-    # 2. Lookup SRV per i domini pubblici (es. mc.coralmc.it)
     try:
         try:
             server = JavaServer.lookup(ip, timeout=4.0)
@@ -81,7 +79,6 @@ def query_minecraft_server(ip):
             server = JavaServer.lookup(ip)
         return server.status(), None
     except Exception as e_srv:
-        # Fallback connessione diretta sulla porta 25565
         try:
             try:
                 server = JavaServer(ip, 25565, timeout=4.0)
@@ -102,7 +99,6 @@ def background_tracker():
             print(f"\n🔄 [{time_str}] Avvio ping PARALLELO per {len(current_servers)} server...")
             start_t = time.time()
             
-            # Esecuzione parallela immediata per tutti i server
             ping_results = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(current_servers), 1)) as executor:
                 futures = {executor.submit(query_minecraft_server, ip): ip for ip in current_servers}
@@ -160,9 +156,16 @@ def background_tracker():
 
         time.sleep(PING_INTERVAL)
 
-# Avvio del thread
 tracking_thread = threading.Thread(target=background_tracker, daemon=True)
 tracking_thread.start()
+
+def safe_int_format(val):
+    if val is None:
+        return "-"
+    try:
+        return f"{int(val):,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return str(val)
 
 def get_server_analytics(ip, current_players):
     now_ts = int(time.time())
@@ -172,22 +175,32 @@ def get_server_analytics(ip, current_players):
     ts_72h = now_ts - (72 * 3600)
     c.execute("SELECT MAX(players) FROM server_stats WHERE ip = ? AND timestamp >= ?", (ip, ts_72h))
     row_72h = c.fetchone()
-    peak_72h = row_72h[0] if row_72h and row_72h[0] is not None else current_players
+    peak_val = row_72h[0] if row_72h and row_72h[0] is not None else current_players
     
     c.execute("SELECT players, timestamp FROM server_stats WHERE ip = ? ORDER BY players DESC LIMIT 1", (ip,))
     row_rec = c.fetchone()
     if row_rec and row_rec[0] is not None:
         rec_players = row_rec[0]
-        rec_date = datetime.fromtimestamp(row_rec[1]).strftime("%d/%m/%Y")
+        try:
+            rec_date = datetime.fromtimestamp(int(row_rec[1])).strftime("%d/%m/%Y")
+        except (ValueError, TypeError, OSError):
+            rec_date = datetime.now().strftime("%d/%m/%Y")
     else:
         rec_players = current_players
         rec_date = datetime.now().strftime("%d/%m/%Y")
         
     def get_past_players(seconds_ago):
         target_ts = now_ts - seconds_ago
-        c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1", (ip, target_ts))
+        # Finestra di tolleranza di 3 ore (10800 secondi) attorno al momento esatto nel passato
+        # In questo modo ignoriamo i timestamp modificati/antichi come quello del record nel 2023
+        min_ts = target_ts - 10800
+        max_ts = target_ts + 10800
+        
+        c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp BETWEEN ? AND ? ORDER BY ABS(timestamp - ?) ASC LIMIT 1", (ip, min_ts, max_ts, target_ts))
         r = c.fetchone()
-        return f"{r[0]:,}".replace(",", ".") if r and r[0] is not None else "-"
+        if r and r[0] is not None:
+            return safe_int_format(r[0])
+        return "-"
         
     p_1d = get_past_players(86400)
     p_2d = get_past_players(2 * 86400)
@@ -206,8 +219,8 @@ def get_server_analytics(ip, current_players):
         chart_data = [current_players, current_players]
         
     return {
-        "peak_72h": f"{peak_72h:,}".replace(",", "."),
-        "record": f"{rec_players:,} ({rec_date})".replace(",", "."),
+        "peak_72h": safe_int_format(peak_val),
+        "record": f"{safe_int_format(rec_players)} ({rec_date})",
         "day_1": p_1d,
         "day_2": p_2d,
         "day_3": p_3d,
@@ -219,7 +232,7 @@ def get_server_analytics(ip, current_players):
 def index():
     return render_template("index.html")
 
-@app.route("/api/servers", methods=["GET", "POST"])
+@app.route("/api/servers", methods=["GET", "POST", "DELETE"])
 def handle_servers():
     global servers_list
     if request.method == "POST":
@@ -229,6 +242,14 @@ def handle_servers():
             servers_list.append(new_ip)
             save_servers(servers_list)
             SERVER_STATES.pop(new_ip, None)
+        return jsonify(servers_list)
+    elif request.method == "DELETE":
+        data = request.get_json() or {}
+        ip_to_remove = data.get("ip", "").strip()
+        if ip_to_remove in servers_list:
+            servers_list.remove(ip_to_remove)
+            save_servers(servers_list)
+            SERVER_STATES.pop(ip_to_remove, None)
         return jsonify(servers_list)
     return jsonify(servers_list)
 

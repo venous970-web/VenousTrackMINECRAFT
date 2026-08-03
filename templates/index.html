@@ -41,10 +41,52 @@
             font-weight: 700;
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .add-server-box {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-server-box input {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            width: 220px;
+        }
+
+        .add-server-box input:focus {
+            border-color: #eab308;
+        }
+
+        .add-server-box button {
+            background: #eab308;
+            color: #121212;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .add-server-box button:hover {
+            background: #ca8a04;
+        }
+
         .live-badge {
             background: #1e1e1e;
             border: 1px solid #333;
-            padding: 6px 12px;
+            padding: 8px 14px;
             border-radius: 20px;
             font-size: 14px;
             display: flex;
@@ -94,6 +136,7 @@
             display: flex;
             gap: 15px;
             align-items: flex-start;
+            flex: 1;
         }
 
         .rank-num {
@@ -173,9 +216,15 @@
             <h1>📊 Venous Track</h1>
         </div>
         
-        <div class="live-badge">
-            <div class="live-dot"></div>
-            <span>Live: <strong id="clock">00:00:00</strong></span>
+        <div class="header-controls">
+            <div class="add-server-box">
+                <input type="text" id="serverInput" placeholder="IP Server (es. mc.server.it)">
+                <button onclick="addServer()">Aggiungi</button>
+            </div>
+            <div class="live-badge">
+                <div class="live-dot"></div>
+                <span>Live: <strong id="clock">00:00:00</strong></span>
+            </div>
         </div>
     </div>
 
@@ -192,6 +241,29 @@
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        async function addServer() {
+            const input = document.getElementById('serverInput');
+            const ip = input.value.trim();
+            if (!ip) return;
+
+            try {
+                const res = await fetch('/api/servers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    input.value = '';
+                    fetchStats();
+                } else {
+                    alert(data.message || 'Errore durante l\'aggiunta.');
+                }
+            } catch (err) {
+                console.error("Errore aggiunta server:", err);
+            }
+        }
 
         async function fetchStats() {
             try {
@@ -214,7 +286,6 @@
                 const statusClass = server.online ? 'online' : 'offline';
                 const statusText = server.online ? 'ONLINE' : 'OFFLINE';
 
-                // SE LA CARD NON ESISTE: la creiamo da zero
                 if (!card) {
                     card = document.createElement('div');
                     card.id = `card-${safeIpId}`;
@@ -243,7 +314,6 @@
                     `;
                     container.appendChild(card);
                 } else {
-                    // SE LA CARD ESISTE GIÀ: Aggiorniamo solo i singoli testi SENZA toccare il canvas
                     document.getElementById(`rank-${safeIpId}`).innerText = `#${index + 1}`;
                     document.getElementById(`players-${safeIpId}`).innerText = server.players.toLocaleString('it-IT');
                     document.getElementById(`peak-${safeIpId}`).innerText = server.peak_72h;
@@ -262,11 +332,9 @@
                         icon.src = server.favicon;
                     }
 
-                    // Riordina la card nel DOM se la posizione in classifica è cambiata
                     container.appendChild(card);
                 }
 
-                // AGGIORNAMENTO O CREAZIONE DEL GRAFICO (Inalterato)
                 if (charts[safeIpId]) {
                     charts[safeIpId].data.labels = server.chart_labels;
                     charts[safeIpId].data.datasets[0].data = server.chart_data;
@@ -323,7 +391,6 @@
             });
         }
 
-        // Primo avvio e refresh ogni 5 secondi
         fetchStats();
         setInterval(fetchStats, 5000);
     </script>

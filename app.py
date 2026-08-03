@@ -198,7 +198,6 @@ def get_server_analytics(ip, current_players):
     conn.close()
     
     rows_chart.reverse()
-    # Formato con SECONDI (%H:%M:%S)
     chart_labels = [datetime.fromtimestamp(r[0]).strftime("%H:%M:%S") for r in rows_chart]
     chart_data = [r[1] for r in rows_chart]
     
@@ -220,7 +219,7 @@ def get_server_analytics(ip, current_players):
 def index():
     return render_template("index.html")
 
-@app.route("/api/servers", methods=["GET", "POST", "DELETE"])
+@app.route("/api/servers", methods=["GET", "POST"])
 def handle_servers():
     global servers_list
     if request.method == "POST":
@@ -230,14 +229,6 @@ def handle_servers():
             servers_list.append(new_ip)
             save_servers(servers_list)
             SERVER_STATES.pop(new_ip, None)
-        return jsonify(servers_list)
-    elif request.method == "DELETE":
-        data = request.get_json() or {}
-        ip_to_remove = data.get("ip", "").strip()
-        if ip_to_remove in servers_list:
-            servers_list.remove(ip_to_remove)
-            save_servers(servers_list)
-            SERVER_STATES.pop(ip_to_remove, None)
         return jsonify(servers_list)
     return jsonify(servers_list)
 

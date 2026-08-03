@@ -32,7 +32,15 @@
         .title-container {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        .site-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #252525;
         }
 
         .title-container h1 {
@@ -213,7 +221,8 @@
 
     <div class="header">
         <div class="title-container">
-            <h1>📊 Venous Track</h1>
+            <img class="site-logo" src="/static/head.png" alt="Head" onerror="this.style.display='none'">
+            <h1>Venous Track</h1>
         </div>
         
         <div class="header-controls">

@@ -18,7 +18,7 @@ CONFIG_FILE = "servers.json"
 
 SERVER_STATES = {}
 MAX_FAILS = 3
-PING_INTERVAL = 15  # Intervallo del ping reale verso i server Minecraft (15 secondi)
+PING_INTERVAL = 5  # Intervallo del ping in secondi
 ITALY_TZ = ZoneInfo("Europe/Rome")
 
 def init_db():
@@ -62,79 +62,112 @@ def save_servers(servers):
 servers_list = load_servers()
 
 def query_minecraft_server(ip):
+    """ Pinga un singolo server gestendo il timeout in fase di inizializzazione """
+    if ":" in ip:
+        try:
+            host, port_str = ip.split(":", 1)
+            try:
+                server = JavaServer(host, int(port_str), timeout=4.0)
+            except TypeError:
+                server = JavaServer(host, int(port_str))
+            return server.status(), None
+        except Exception as e:
+            return None, f"Porta diretta: {e}"
+
     try:
-        server = JavaServer.lookup(ip)
-        return server.status()
-    except Exception:
-        pass
-        
-    try:
-        if ":" in ip:
-            host, port_str = ip.split(":")
-            server = JavaServer(host, int(port_str))
-        else:
-            server = JavaServer(ip, 25565)
-        return server.status()
-    except Exception:
-        return None
+        try:
+            server = JavaServer.lookup(ip, timeout=4.0)
+        except TypeError:
+            server = JavaServer.lookup(ip)
+        return server.status(), None
+    except Exception as e_srv:
+        try:
+            try:
+                server = JavaServer(ip, 25565, timeout=4.0)
+            except TypeError:
+                server = JavaServer(ip, 25565)
+            return server.status(), None
+        except Exception as e_dir:
+            return None, f"SRV fallito ({e_srv}) | Diretto fallito ({e_dir})"
 
 def background_tracker():
+    """ Thread in background che esegue il ping SIMULTANEO di tutti i server """
     while True:
         now_ts = int(time.time())
         current_servers = list(servers_list)
         
-        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-            ping_results = list(executor.map(lambda ip: (ip, query_minecraft_server(ip)), current_servers))
+        if current_servers:
+            time_str = datetime.now(ITALY_TZ).strftime('%H:%M:%S')
+            print(f"\n🔄 [{time_str}] Avvio ping PARALLELO per {len(current_servers)} server...")
+            start_t = time.time()
             
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        
-        for ip, status in ping_results:
-            if ip not in SERVER_STATES:
-                SERVER_STATES[ip] = {
-                    "ip": ip,
-                    "online": True,
-                    "players": 0,
-                    "max": 0,
-                    "version": "Inizializzazione...",
-                    "favicon": None,
-                    "fail_count": 0
-                }
+            ping_results = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(current_servers), 1)) as executor:
+                futures = {executor.submit(query_minecraft_server, ip): ip for ip in current_servers}
+                for future in concurrent.futures.as_completed(futures):
+                    ip = futures[future]
+                    status, err = future.result()
+                    ping_results.append((ip, status, err))
+
+            elapsed = round(time.time() - start_t, 2)
+            print(f"⏱️ Controllati {len(current_servers)} server in simultanea ({elapsed}s)")
+            
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            for ip, status, err in ping_results:
+                if ip not in SERVER_STATES:
+                    SERVER_STATES[ip] = {
+                        "ip": ip,
+                        "online": True,
+                        "players": 0,
+                        "max": 0,
+                        "version": "Inizializzazione...",
+                        "favicon": None,
+                        "fail_count": 0
+                    }
+                    
+                state = SERVER_STATES[ip]
                 
-            state = SERVER_STATES[ip]
-            
-            if status is not None:
-                try:
-                    players = status.players.online
-                    max_p = status.players.max
-                    version = status.version.name if hasattr(status.version, 'name') else "1.7.2-1.21"
-                    favicon = status.icon if hasattr(status, 'icon') and status.icon else state["favicon"]
+                if status is not None:
+                    players = getattr(status.players, 'online', 0)
+                    max_p = getattr(status.players, 'max', 0)
+                    version = status.version.name if hasattr(status, 'version') and hasattr(status.version, 'name') else "1.7.x - 1.21.x"
+                    favicon = getattr(status, 'favicon', getattr(status, 'icon', None))
                     
                     state["fail_count"] = 0
                     state["online"] = True
                     state["players"] = players
                     state["max"] = max_p
                     state["version"] = version
-                    state["favicon"] = favicon
-                    
+                    if favicon:
+                        state["favicon"] = favicon
+                        
                     c.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, now_ts, players, max_p))
-                except Exception:
+                    print(f"  🟢 {ip} -> ONLINE | Giocatori: {players}/{max_p}")
+                else:
                     state["fail_count"] += 1
-            else:
-                state["fail_count"] += 1
+                    if state["fail_count"] >= MAX_FAILS or not state["online"]:
+                        state["online"] = False
+                        state["players"] = 0
+                        state["version"] = "Non raggiungibile"
+                    print(f"  🔴 {ip} -> OFFLINE ({state['fail_count']}/{MAX_FAILS}) | Errore: {err}")
 
-            if state["fail_count"] >= MAX_FAILS:
-                state["online"] = False
-                state["players"] = 0
-                state["version"] = "Non raggiungibile"
+            conn.commit()
+            conn.close()
 
-        conn.commit()
-        conn.close()
-        
         time.sleep(PING_INTERVAL)
 
 tracking_thread = threading.Thread(target=background_tracker, daemon=True)
 tracking_thread.start()
+
+def safe_int_format(val):
+    if val is None:
+        return "-"
+    try:
+        return f"{int(val):,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return str(val)
 
 def get_server_analytics(ip, current_players):
     now_ts = int(time.time())
@@ -144,26 +177,29 @@ def get_server_analytics(ip, current_players):
     ts_72h = now_ts - (72 * 3600)
     c.execute("SELECT MAX(players) FROM server_stats WHERE ip = ? AND timestamp >= ?", (ip, ts_72h))
     row_72h = c.fetchone()
-    peak_72h = row_72h[0] if row_72h and row_72h[0] is not None else current_players
+    peak_val = row_72h[0] if row_72h and row_72h[0] is not None else current_players
     
     c.execute("SELECT players, timestamp FROM server_stats WHERE ip = ? ORDER BY players DESC LIMIT 1", (ip,))
     row_rec = c.fetchone()
     if row_rec and row_rec[0] is not None:
         rec_players = row_rec[0]
-        rec_date = datetime.fromtimestamp(row_rec[1], ITALY_TZ).strftime("%d/%m/%Y")
+        try:
+            rec_date = datetime.fromtimestamp(int(row_rec[1]), ITALY_TZ).strftime("%d/%m/%Y")
+        except (ValueError, TypeError, OSError):
+            rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
     else:
         rec_players = current_players
         rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
         
     def get_past_players(seconds_ago):
         target_ts = now_ts - seconds_ago
-        c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1", (ip, target_ts))
+        min_ts = target_ts - 10800
+        max_ts = target_ts + 10800
+        
+        c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp BETWEEN ? AND ? ORDER BY ABS(timestamp - ?) ASC LIMIT 1", (ip, min_ts, max_ts, target_ts))
         r = c.fetchone()
         if r and r[0] is not None:
-            try:
-                return f"{int(r[0]):,}".replace(",", ".")
-            except ValueError:
-                return str(r[0])
+            return safe_int_format(r[0])
         return "-"
         
     p_1d = get_past_players(86400)
@@ -179,16 +215,12 @@ def get_server_analytics(ip, current_players):
     chart_data = [r[1] for r in rows_chart]
     
     if len(chart_data) < 2:
-        now_str = datetime.now(ITALY_TZ).strftime("%H:%M:%S")
-        chart_labels = ["--:--:--", now_str]
+        chart_labels = ["--:--:--", datetime.now(ITALY_TZ).strftime("%H:%M:%S")]
         chart_data = [current_players, current_players]
         
-    peak_72h_str = f"{int(peak_72h):,}".replace(",", ".") if peak_72h is not None else "0"
-    record_str = f"{int(rec_players):,} ({rec_date})".replace(",", ".") if rec_players is not None else f"0 ({rec_date})"
-
     return {
-        "peak_72h": peak_72h_str,
-        "record": record_str,
+        "peak_72h": safe_int_format(peak_val),
+        "record": f"{safe_int_format(rec_players)} ({rec_date})",
         "day_1": p_1d,
         "day_2": p_2d,
         "day_3": p_3d,
@@ -200,25 +232,8 @@ def get_server_analytics(ip, current_players):
 def index():
     return render_template("index.html")
 
-@app.route("/api/servers", methods=["GET", "POST", "DELETE"])
+@app.route("/api/servers", methods=["GET"])
 def handle_servers():
-    global servers_list
-    if request.method == "POST":
-        data = request.get_json() or {}
-        new_ip = data.get("ip", "").strip()
-        if new_ip and new_ip not in servers_list:
-            servers_list.append(new_ip)
-            save_servers(servers_list)
-            SERVER_STATES.pop(new_ip, None)
-        return jsonify(servers_list)
-    elif request.method == "DELETE":
-        data = request.get_json() or {}
-        ip_to_remove = data.get("ip", "").strip()
-        if ip_to_remove in servers_list:
-            servers_list.remove(ip_to_remove)
-            save_servers(servers_list)
-            SERVER_STATES.pop(ip_to_remove, None)
-        return jsonify(servers_list)
     return jsonify(servers_list)
 
 @app.route("/api/stats", methods=["GET"])

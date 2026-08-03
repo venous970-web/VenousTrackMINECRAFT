@@ -267,51 +267,70 @@
                 const safeIpId = server.ip.replace(/[^a-zA-Z0-9]/g, '_');
                 let card = document.getElementById(`card-${safeIpId}`);
 
-                // Se la card non esiste, la creiamo
-                if (!card) {
-                    card = document.createElement('div');
-                    card.id = `card-${safeIpId}`;
-                    card.className = 'server-card';
-                    container.appendChild(card);
-                }
-
                 const faviconSrc = server.favicon || '/static/head.png';
                 const statusClass = server.online ? 'online' : 'offline';
                 const statusText = server.online ? 'ONLINE' : 'OFFLINE';
 
-                // AGGIORNAMENTO DINAMICO DI TUTTI I TESTI
-                card.innerHTML = `
-                    <button class="btn-delete" onclick="deleteServer('${server.ip}')">🗑️ Elimina</button>
-                    <div class="server-info">
-                        <div class="rank-num">#${index + 1}</div>
-                        <img class="server-icon" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
-                        <div class="server-details">
-                            <div class="server-header-line">
-                                <span class="server-name">${server.ip}</span>
-                                <span class="status-badge ${statusClass}">${statusText}</span>
+                // SE LA CARD NON ESISTE: la creiamo da zero
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${safeIpId}`;
+                    card.className = 'server-card';
+                    card.innerHTML = `
+                        <button class="btn-delete" onclick="deleteServer('${server.ip}')">🗑️ Elimina</button>
+                        <div class="server-info">
+                            <div class="rank-num" id="rank-${safeIpId}">#${index + 1}</div>
+                            <img class="server-icon" id="icon-${safeIpId}" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
+                            <div class="server-details">
+                                <div class="server-header-line">
+                                    <span class="server-name">${server.ip}</span>
+                                    <span class="status-badge ${statusClass}" id="status-${safeIpId}">${statusText}</span>
+                                </div>
+                                <div class="stat-line">Players: <span id="players-${safeIpId}">${server.players.toLocaleString('it-IT')}</span></div>
+                                <div class="stat-line">72h Peak: <span id="peak-${safeIpId}">${server.peak_72h}</span></div>
+                                <div class="stat-line">Record: <span id="record-${safeIpId}">${server.record}</span></div>
+                                <div class="stat-line">1 Day Ago: <span id="d1-${safeIpId}">${server.day_1}</span></div>
+                                <div class="stat-line">2 Days Ago: <span id="d2-${safeIpId}">${server.day_2}</span></div>
+                                <div class="stat-line">3 Days Ago: <span id="d3-${safeIpId}">${server.day_3}</span></div>
+                                <div class="stat-line" id="ver-${safeIpId}" style="font-size:11px; margin-top:4px; color:#777;">${server.version}</div>
                             </div>
-                            <div class="stat-line">Players: <span id="players-${safeIpId}">${server.players.toLocaleString('it-IT')}</span></div>
-                            <div class="stat-line">72h Peak: <span>${server.peak_72h}</span></div>
-                            <div class="stat-line">Record: <span>${server.record}</span></div>
-                            <div class="stat-line">1 Day Ago: <span>${server.day_1}</span></div>
-                            <div class="stat-line">2 Days Ago: <span>${server.day_2}</span></div>
-                            <div class="stat-line">3 Days Ago: <span>${server.day_3}</span></div>
-                            <div class="stat-line" style="font-size:11px; margin-top:4px; color:#777;">${server.version}</div>
                         </div>
-                    </div>
-                    <div class="chart-box">
-                        <canvas id="chart-${safeIpId}"></canvas>
-                    </div>
-                `;
+                        <div class="chart-box">
+                            <canvas id="chart-${safeIpId}"></canvas>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                } else {
+                    // SE LA CARD ESISTE GIÀ: Aggiorniamo solo i singoli testi SENZA piallare il canvas
+                    document.getElementById(`rank-${safeIpId}`).innerText = `#${index + 1}`;
+                    document.getElementById(`players-${safeIpId}`).innerText = server.players.toLocaleString('it-IT');
+                    document.getElementById(`peak-${safeIpId}`).innerText = server.peak_72h;
+                    document.getElementById(`record-${safeIpId}`).innerText = server.record;
+                    document.getElementById(`d1-${safeIpId}`).innerText = server.day_1;
+                    document.getElementById(`d2-${safeIpId}`).innerText = server.day_2;
+                    document.getElementById(`d3-${safeIpId}`).innerText = server.day_3;
+                    document.getElementById(`ver-${safeIpId}`).innerText = server.version;
 
-                // AGGIORNAMENTO GRAFICO (Senza pallini, con orario HH:mm:ss)
-                const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
-                
+                    const statusBadge = document.getElementById(`status-${safeIpId}`);
+                    statusBadge.className = `status-badge ${statusClass}`;
+                    statusBadge.innerText = statusText;
+
+                    const icon = document.getElementById(`icon-${safeIpId}`);
+                    if (server.favicon && icon.src !== server.favicon) {
+                        icon.src = server.favicon;
+                    }
+
+                    // Riordina la card nel DOM se la posizione in classifica è cambiata
+                    container.appendChild(card);
+                }
+
+                // AGGIORNAMENTO O CREAZIONE DEL GRAFICO (Senza pallini, con orario HH:mm:ss)
                 if (charts[safeIpId]) {
                     charts[safeIpId].data.labels = server.chart_labels;
                     charts[safeIpId].data.datasets[0].data = server.chart_data;
-                    charts[safeIpId].update('none'); // Aggiornamento fluido senza sfarfallii
+                    charts[safeIpId].update('none'); // Aggiornamento istantaneo e fluido
                 } else {
+                    const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
                     charts[safeIpId] = new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -323,9 +342,9 @@
                                 borderWidth: 2,
                                 fill: true,
                                 tension: 0.35,
-                                pointRadius: 0,           // ZERO PALLINI DI DEFAULT
-                                pointHoverRadius: 6,      // PALLINO SOLO AL TOUCH / HOVER
-                                pointHitRadius: 20,       // FACILE DA TOCCARE DA MOBILE
+                                pointRadius: 0,           // Nessun pallino di default
+                                pointHoverRadius: 6,      // Pallino visibile solo al passaggio/touch
+                                pointHitRadius: 20,       // Facile da toccare da telefono
                                 pointBackgroundColor: '#eab308'
                             }]
                         },
@@ -341,7 +360,7 @@
                                     displayColors: false,
                                     callbacks: {
                                         title: function(context) {
-                                            return 'Ora: ' + context[0].label; // Mostra HH:mm:ss
+                                            return 'Ora: ' + context[0].label; // HH:mm:ss
                                         },
                                         label: function(context) {
                                             return 'Giocatori: ' + context.raw.toLocaleString('it-IT');
@@ -389,7 +408,7 @@
             fetchStats();
         }
 
-        // Fetch iniziale e aggiornamento ogni 5 secondi
+        // Primo avvio e refresh ogni 5 secondi
         fetchStats();
         setInterval(fetchStats, 5000);
     </script>

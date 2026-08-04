@@ -183,7 +183,7 @@
         .container { padding: 30px; max-width: 1200px; margin: auto; }
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 20px;
         }
         .card {
@@ -212,17 +212,21 @@
         .stats-grid {
             display: grid; 
             grid-template-columns: 1fr 1fr; 
-            gap: 12px;
+            gap: 10px 15px;
             margin-bottom: 20px; 
             font-size: 0.85rem; 
             color: var(--text-muted);
         }
         
+        .stats-grid div {
+            display: flex;
+            flex-direction: column;
+        }
+
         .stats-grid strong { 
             color: var(--accent-yellow); 
-            display: block; 
-            font-size: 1.3rem;
-            margin-top: 4px;
+            font-size: 1.1rem;
+            margin-top: 2px;
             font-weight: bold;
         }
         
@@ -240,7 +244,7 @@
 </head>
 <body>
 
-    <!-- Schermata iniziale con Account Default e Login -->
+    <!-- Schermata iniziale -->
     <div id="landing-screen">
         <div class="landing-header">
             <img src="/static/head.png" alt="Logo" class="logo-icon">
@@ -272,9 +276,7 @@
                     <div class="live-dot"></div>
                     <span id="clock">--:--:--</span>
                 </div>
-                <!-- Tasto Aggiungi Server (visibile solo in Generali per default o se autorizzato) -->
                 <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem; width: auto;">➕ Aggiungi Server</button>
-                <!-- Tasto Logout -->
                 <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555; width: auto;">Logout</button>
             </div>
         </header>
@@ -356,7 +358,6 @@
                     document.getElementById('logout-btn').style.display = 'none';
                 }
 
-                // Aggiungi server abilitato solo se i permessi lo consentono E ci si trova nella categoria corretta
                 const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
                 if (canAdd) {
                     document.getElementById('add-server-header-btn').style.display = 'block';
@@ -415,7 +416,7 @@
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
                     const statusClass = srv.online ? 'card-status' : 'card-status offline';
-                    const statusText = srv.online ? '🟢 Online' : '🔴 Offline';
+                    const statusText = srv.online ? `🟢 Online (${srv.players} players)` : '🔴 Offline';
                     
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 
@@ -431,10 +432,12 @@
                             </div>
                         </div>
                         <div class="stats-grid">
-                            <div>Picco 72h:<strong>${srv.peak_72h}</strong></div>
-                            <div>Record:<strong>${srv.record}</strong></div>
-                            <div>Ieri:<strong>${srv.day_1}</strong></div>
-                            <div>2 Giorni Fa:<strong>${srv.day_2}</strong></div>
+                            <div>Players: <strong>${srv.players}</strong></div>
+                            <div>Record: <strong>${srv.record}</strong></div>
+                            <div>72h peak: <strong>${srv.peak_72h}</strong></div>
+                            <div>1 Days ago: <strong>${srv.day_1}</strong></div>
+                            <div>2 Days ago: <strong>${srv.day_2}</strong></div>
+                            <div>3 Days ago: <strong>${srv.day_3 || 0}</strong></div>
                         </div>
                         <div class="chart-container">
                             <canvas id="chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}"></canvas>
@@ -483,6 +486,9 @@
                             mode: 'index',
                             intersect: false,
                             callbacks: {
+                                title: function(context) {
+                                    return `Orario: ${context[0].label}`;
+                                },
                                 label: function(context) {
                                     return ` Player: ${context.parsed.y}`;
                                 }

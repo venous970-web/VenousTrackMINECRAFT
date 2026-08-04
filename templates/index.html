@@ -3,333 +3,411 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VenousTrack - Minecraft Server Statistics</title>
-    <!-- Chart.js per i grafici -->
+    <title>Venous Track</title>
+    <!-- Favicon locale -->
+    <link rel="icon" type="image/png" href="/static/head.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-color: #121212;
-            --card-bg: #1e1e1e;
-            --text-color: #e0e0e0;
-            --accent-color: #ffc107;
+            --bg-dark: #121212;
+            --bg-card: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --accent-yellow: #ffc107;
             --accent-hover: #e0a800;
-            --border-color: #2a2a2a;
-            --danger-color: #dc3545;
-            --success-color: #28a745;
+            --red-delete: #dc3545;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
             margin: 0;
             padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
         }
 
-        header {
-            background-color: var(--card-bg);
-            border-bottom: 1px solid var(--border-color);
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: var(--accent-color);
-        }
-
-        .user-panel {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        button, .tab-btn {
-            background-color: var(--accent-color);
-            color: #000;
-            border: none;
-            padding: 8px 16px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        button:hover, .tab-btn:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 30px auto;
-            padding: 0 20px;
-        }
-
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .tab-btn {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-        }
-
-        .tab-btn.active {
-            background-color: var(--accent-color);
-            color: #000;
-            border-color: var(--accent-color);
-        }
-
-        .controls-bar {
-            background-color: var(--card-bg);
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 25px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        input[type="text"], input[type="password"] {
-            background-color: #2a2a2a;
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            padding: 8px 12px;
-            border-radius: 4px;
-            flex-grow: 1;
-            max-width: 300px;
-        }
-
-        .servers-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-        }
-
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .card-header {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .card-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 4px;
-            object-fit: contain;
-            background-color: #2a2a2a;
-        }
-
-        .card-title {
-            margin: 0;
-            font-size: 1.1rem;
-            word-break: break-all;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            font-size: 0.75rem;
-            border-radius: 12px;
-            font-weight: bold;
-        }
-
-        .status-badge.online {
-            background-color: rgba(40, 167, 69, 0.2);
-            color: var(--success-color);
-        }
-
-        .status-badge.offline {
-            background-color: rgba(220, 53, 69, 0.2);
-            color: var(--danger-color);
-        }
-
-        .card-version {
-            font-size: 0.85rem;
-            color: #888;
-            margin-top: 2px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            font-size: 0.9rem;
-            background-color: #161616;
-            padding: 10px;
-            border-radius: 6px;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 120px;
-            width: 100%;
-        }
-
-        .delete-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background-color: transparent;
-            color: var(--danger-color);
-            border: 1px solid var(--danger-color);
-            padding: 2px 8px;
-            font-size: 0.75rem;
-            border-radius: 4px;
-        }
-
-        .delete-btn:hover {
-            background-color: var(--danger-color);
-            color: #fff;
-        }
-
-        .rank-badge {
-            font-weight: bold;
-            color: #777;
-            font-size: 0.9rem;
-        }
-
-        /* Modal di Login */
-        .modal {
-            display: none;
+        #landing-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.7);
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 1000;
         }
-        .modal-content {
-            background-color: var(--card-bg);
-            padding: 30px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            width: 300px;
+
+        .landing-header {
             display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon, .card-icon {
+            background: transparent !important;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+        }
+
+        .landing-title {
+            font-size: 2.5rem;
+            margin: 0;
+        }
+
+        .landing-buttons {
+            display: flex;
+            gap: 20px;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .btn {
+            background-color: var(--accent-yellow);
+            color: #000;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 250px;
+            text-align: center;
+        }
+
+        .btn:hover { background-color: var(--accent-hover); }
+
+        #login-form {
+            display: none;
             flex-direction: column;
             gap: 15px;
+            margin-top: 20px;
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #333;
+            background: #2a2a2a;
+            color: white;
+            border-radius: 6px;
+        }
+
+        #main-app { display: none; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid #333;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+        }
+
+        .live-clock {
+            background: #2a2a2a;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-dot {
+            width: 10px; height: 10px;
+            background-color: #28a745;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        #side-menu {
+            position: fixed;
+            top: 0; left: -250px;
+            width: 250px; height: 100%;
+            background-color: var(--bg-card);
+            border-right: 1px solid #333;
+            transition: 0.3s;
+            z-index: 500;
+            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #side-menu.open { left: 0; }
+        
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .menu-item {
+            background: none; border: none;
+            color: white; font-size: 1.1rem;
+            padding: 15px 20px; text-align: left;
+            cursor: pointer; transition: 0.2s;
+            width: 100%;
+        }
+        .menu-item:hover { background: #333; }
+
+        .container { padding: 30px; max-width: 1200px; margin: auto; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+        .card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .card-icon { width: 48px; height: 48px; }
+        .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; display: flex; align-items: center; }
+        
+        .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
+        
+        .card-status { font-size: 0.95rem; color: #28a745; font-weight: 500; }
+        .card-status.offline { color: var(--red-delete); }
+        .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        
+        .delete-btn {
+            position: absolute; top: 15px; right: 15px;
+            background: var(--red-delete); color: white;
+            border: none; padding: 5px 10px; border-radius: 5px;
+            cursor: pointer; display: none;
+        }
+        
+        .stats-grid {
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px 15px;
+            margin-bottom: 20px; 
+            font-size: 0.85rem; 
+            color: var(--text-muted);
+        }
+        
+        .stats-grid div {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stats-grid strong { 
+            color: var(--accent-yellow); 
+            font-size: 1.1rem;
+            margin-top: 2px;
+            font-weight: bold;
+        }
+        
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 130px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 130px !important;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="logo">⚡ VenousTrack</div>
-        <div class="user-panel" id="user-panel">
-            <span id="username-display">Ospite</span>
-            <button id="auth-btn" onclick="openLoginModal()">Login</button>
+    <!-- Schermata iniziale -->
+    <div id="landing-screen">
+        <div class="landing-header">
+            <img src="/static/head.png" alt="Logo" class="logo-icon">
+            <h1 class="landing-title">Venous Track</h1>
         </div>
-    </header>
-
-    <div class="container">
-        <!-- Tabs Categorie -->
-        <div class="nav-tabs">
-            <button class="tab-btn active" id="tab-italiani" onclick="switchCategory('italiani')">Server Italiani</button>
-            <button class="tab-btn" id="tab-generali" onclick="switchCategory('generali')">Server Generali</button>
+        <div class="landing-buttons" id="landing-buttons">
+            <button class="btn" onclick="enterApp('italiani')">Accedi (Default)</button>
+            <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login Admin</button>
         </div>
-
-        <!-- Barra di controllo aggiunta server -->
-        <div class="controls-bar" id="controls-bar" style="display: none;">
-            <input type="text" id="server-ip-input" placeholder="Inserisci IP server (es. play.server.it)">
-            <button onclick="addServer()">Aggiungi Server</button>
-        </div>
-
-        <!-- Griglia dei Server -->
-        <div class="servers-grid" id="servers-grid">
-            <!-- Popolato via JS -->
+        <div id="login-form">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button class="btn" onclick="performLogin()" style="width: 100%;">Conferma Login</button>
         </div>
     </div>
 
-    <!-- Modal Login -->
-    <div class="modal" id="login-modal">
-        <div class="modal-content">
-            <h3>Login Amministratore</h3>
-            <input type="text" id="login-username" placeholder="Username">
-            <input type="password" id="login-password" placeholder="Password">
-            <button onclick="performLogin()">Accedi</button>
-            <button style="background-color: #444; color: #fff;" onclick="closeLoginModal()">Annulla</button>
+    <!-- App Principale -->
+    <div id="main-app">
+        <header>
+            <div class="header-left">
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="/static/head.png" alt="Logo" class="logo-icon" style="width: 36px; height: 36px;">
+                    <h2 id="category-title" style="margin:0;">Server Italiani</h2>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-clock">
+                    <div class="live-dot"></div>
+                    <span id="clock">--:--:--</span>
+                </div>
+                <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem; width: auto;">➕ Aggiungi Server</button>
+                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555; width: auto;">Logout</button>
+            </div>
+        </header>
+
+        <!-- Menu laterale -->
+        <div id="side-menu">
+            <div class="menu-header">
+                <h3 style="margin:0;">Menu</h3>
+                <button class="menu-btn" onclick="toggleMenu()" style="font-size: 1.4rem;">✕</button>
+            </div>
+            <button class="menu-item" onclick="switchCategory('italiani')">🇮🇹 Server Italiani</button>
+            <button class="menu-item" onclick="switchCategory('generali')">🌐 Server Generali</button>
+            <button class="menu-item" onclick="goHome()">🏠 Home</button>
+        </div>
+
+        <div class="container">
+            <div class="grid" id="servers-grid">
+                <!-- Le card dei server verranno caricate qui dinamicamente -->
+            </div>
         </div>
     </div>
 
     <script>
         let currentCategory = 'italiani';
         let userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
+        let isLoggedIn = false;
         let chartsInstances = {};
-        let isLogged = false;
 
-        async function checkAuth() {
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('it-IT');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function toggleMenu() {
+            document.getElementById('side-menu').classList.toggle('open');
+        }
+
+        function toggleLoginBox() {
+            const box = document.getElementById('login-form');
+            box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function enterApp(category) {
+            currentCategory = category;
+            document.getElementById('landing-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('category-title').innerText = category === 'italiani' ? 'Server Italiani' : 'Server Generali';
+            checkAuthStatus();
+            loadServersStats();
+            setInterval(loadServersStats, 5000);
+        }
+
+        function switchCategory(category) {
+            currentCategory = category;
+            document.getElementById('category-title').innerText = category === 'italiani' ? 'Server Italiani' : 'Server Generali';
+            toggleMenu();
+            checkAuthStatus();
+            loadServersStats();
+        }
+
+        function goHome() {
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('landing-screen').style.display = 'flex';
+            document.getElementById('side-menu').classList.remove('open');
+        }
+
+        async function checkAuthStatus() {
             try {
                 const res = await fetch('/api/auth');
                 const data = await res.json();
-                isLogged = data.logged_in;
+                isLoggedIn = data.logged_in;
                 userPermissions = data.permissions;
                 
-                const userDisplay = document.getElementById('username-display');
-                const authBtn = document.getElementById('auth-btn');
-                const controlsBar = document.getElementById('controls-bar');
-
-                if (isLogged) {
-                    userDisplay.innerText = data.username;
-                    authBtn.innerText = 'Logout';
-                    authBtn.onclick = performLogout;
+                if (isLoggedIn) {
+                    document.getElementById('logout-btn').style.display = 'block';
                 } else {
-                    userDisplay.innerText = 'Ospite';
-                    authBtn.innerText = 'Login';
-                    authBtn.onclick = openLoginModal;
+                    document.getElementById('logout-btn').style.display = 'none';
                 }
 
-                // Mostra/Nascondi barra aggiunta in base ai permessi
-                updateControlsVisibility();
+                const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
+                if (canAdd) {
+                    document.getElementById('add-server-header-btn').style.display = 'block';
+                } else {
+                    document.getElementById('add-server-header-btn').style.display = 'none';
+                }
             } catch (e) {
-                console.error("Errore controllo auth:", e);
+                console.error("Errore verifica auth", e);
             }
         }
 
-        function updateControlsVisibility() {
-            const controlsBar = document.getElementById('controls-bar');
-            let canAdd = false;
-            if (currentCategory === 'italiani' && userPermissions.add_italiano) canAdd = true;
-            if (currentCategory === 'generali' && userPermissions.add_generale) canAdd = true;
-            
-            controlsBar.style.display = canAdd ? 'flex' : 'none';
+        async function performLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    enterApp('italiani');
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore di connessione durante il login");
+            }
         }
 
-        function switchCategory(cat) {
-            currentCategory = cat;
-            document.getElementById('tab-italiani').className = cat === 'italiani' ? 'tab-btn active' : 'tab-btn';
-            document.getElementById('tab-generali').className = cat === 'generali' ? 'tab-btn active' : 'tab-btn';
-            updateControlsVisibility();
-            loadServersStats();
+        async function performLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                isLoggedIn = false;
+                userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
+                alert("Logout effettuato");
+                goHome();
+            } catch (e) {
+                console.error("Errore logout", e);
+            }
         }
 
         async function loadServersStats() {
             try {
                 const res = await fetch(`/api/stats/${currentCategory}`);
                 const servers = await res.json();
-                
-                // SALVIAMO LA POSIZIONE ATTUALE DELLO SCROLL PRIMA DI RIGENERARE IL DOM
-                const currentScroll = window.scrollY;
-
                 const grid = document.getElementById('servers-grid');
+                
                 grid.innerHTML = '';
 
                 servers.forEach((srv, index) => {
@@ -337,8 +415,9 @@
                     card.className = 'card';
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
-                    const statusBadgeClass = srv.online ? 'status-badge online' : 'status-badge offline';
-                    const statusText = srv.online ? 'ONLINE' : 'OFFLINE';
+                    const statusClass = srv.online ? 'card-status' : 'card-status offline';
+                    const statusText = srv.online ? `🟢 Online (${srv.players} players)` : '🔴 Offline';
+                    
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 
                     card.innerHTML = `
@@ -348,7 +427,7 @@
                             <img src="${faviconSrc}" class="card-icon" alt="Icon">
                             <div>
                                 <h3 class="card-title">${srv.ip}</h3>
-                                <div style="margin-top: 6px;"><span class="${statusBadgeClass}">${statusText}</span></div>
+                                <div class="${statusClass}">${statusText}</div>
                                 <div class="card-version">${srv.version}</div>
                             </div>
                         </div>
@@ -358,7 +437,7 @@
                             <div>72h peak: <strong>${srv.peak_72h}</strong></div>
                             <div>1 Days ago: <strong>${srv.day_1}</strong></div>
                             <div>2 Days ago: <strong>${srv.day_2}</strong></div>
-                            <div>3 Days ago: <strong>${srv.day_3}</strong></div>
+                            <div>3 Days ago: <strong>${srv.day_3 || 0}</strong></div>
                         </div>
                         <div class="chart-container">
                             <canvas id="chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}"></canvas>
@@ -366,108 +445,108 @@
                     `;
                     grid.appendChild(card);
 
-                    // Render Chart.js
-                    const canvasId = `chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    const ctx = document.getElementById(canvasId);
-                    if (chartsInstances[canvasId]) chartsInstances[canvasId].destroy();
-                    chartsInstances[canvasId] = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: srv.chart_labels,
-                            datasets: [{
-                                data: srv.chart_data,
-                                borderColor: '#ffc107',
-                                backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                                borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                x: { display: false },
-                                y: { display: true, grid: { color: '#2a2a2a' }, ticks: { color: '#a0a0a0', font: { size: 10 }, maxTicksLimit: 4 } }
-                            }
-                        }
-                    });
+                    renderChart(srv);
                 });
-
-                // RIPRISTINIAMO ESATTAMENTE DOVE ERA L'UTENTE
-                window.scrollTo(0, currentScroll);
-
-            } catch (e) { 
-                console.error(e); 
+            } catch (e) {
+                console.error("Errore caricamento statistiche server", e);
             }
         }
 
-        async function addServer() {
-            const input = document.getElementById('server-ip-input');
-            const ip = input.value.trim();
-            if (!ip) return;
+        function renderChart(srv) {
+            const canvasId = `chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
 
-            const res = await fetch(`/api/servers/${currentCategory}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip })
+            if (chartsInstances[canvasId]) {
+                chartsInstances[canvasId].destroy();
+            }
+
+            chartsInstances[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: srv.chart_labels,
+                    datasets: [{
+                        data: srv.chart_data,
+                        borderColor: '#ffc107',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    return `Orario: ${context[0].label}`;
+                                },
+                                label: function(context) {
+                                    return ` Player: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            display: true, 
+                            grid: { color: '#2a2a2a' },
+                            ticks: { color: '#a0a0a0', font: { size: 10 }, maxTicksLimit: 4 }
+                        }
+                    }
+                }
             });
-            const data = await res.json();
-            if (data.status === 'success') {
-                input.value = '';
-                loadServersStats();
-            } else {
-                alert(data.message || 'Errore durante l\'aggiunta');
+        }
+
+        async function promptAddServer() {
+            const ip = prompt("Inserisci l'indirizzo IP del server Minecraft:");
+            if (!ip) return;
+            try {
+                const res = await fetch(`/api/servers/${currentCategory}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("Server aggiunto con successo!");
+                    loadServersStats();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore durante l'aggiunta del server");
             }
         }
 
         async function deleteServer(ip) {
-            if (!confirm(`Sei sicuro di voler eliminare ${ip}?`)) return;
-
-            const res = await fetch(`/api/servers/${currentCategory}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ip })
-            });
-            const data = await res.json();
-            if (data.status === 'success') {
-                loadServersStats();
-            } else {
-                alert(data.message || 'Errore durante l\'eliminazione');
+            if (!confirm(`Sei sicuro di voler eliminare il server ${ip}?`)) return;
+            try {
+                const res = await fetch(`/api/servers/${currentCategory}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("Server eliminato");
+                    loadServersStats();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore durante l'eliminazione");
             }
         }
-
-        function openLoginModal() { document.getElementById('login-modal').style.display = 'flex'; }
-        function closeLoginModal() { document.getElementById('login-modal').style.display = 'none'; }
-
-        async function performLogin() {
-            const username = document.getElementById('login-username').value;
-            const password = document.getElementById('login-password').value;
-
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await res.json();
-            if (data.status === 'success') {
-                closeLoginModal();
-                checkAuth().then(() => loadServersStats());
-            } else {
-                alert(data.message);
-            }
-        }
-
-        async function performLogout() {
-            await fetch('/api/logout', { method: 'POST' });
-            checkAuth().then(() => loadServersStats());
-        }
-
-        // Init
-        window.onload = async () => {
-            await checkAuth();
-            loadServersStats();
-            // Aggiorna automaticamente ogni 5 secondi senza rimbalzi in alto
-            setInterval(loadServersStats, 5000);
-        };
     </script>
 </body>
 </html>

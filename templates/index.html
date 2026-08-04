@@ -198,9 +198,27 @@
         
         .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
         
-        .card-status { font-size: 0.95rem; color: #28a745; font-weight: 500; }
-        .card-status.offline { color: var(--red-delete); }
-        .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .status-badge.online {
+            background-color: #198754;
+            color: #75b798;
+            border: 1px solid #28a745;
+        }
+        .status-badge.offline {
+            background-color: #5c1d23;
+            color: #ea868f;
+            border: 1px solid #dc3545;
+        }
+
+        .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
         
         .delete-btn {
             position: absolute; top: 15px; right: 15px;
@@ -406,8 +424,11 @@
             try {
                 const res = await fetch(`/api/stats/${currentCategory}`);
                 const servers = await res.json();
-                const grid = document.getElementById('servers-grid');
                 
+                // Salva la posizione dello scroll prima di aggiornare il DOM per evitare il rimbalzo in alto
+                const currentScroll = window.scrollY;
+
+                const grid = document.getElementById('servers-grid');
                 grid.innerHTML = '';
 
                 servers.forEach((srv, index) => {
@@ -415,8 +436,8 @@
                     card.className = 'card';
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
-                    const statusClass = srv.online ? 'card-status' : 'card-status offline';
-                    const statusText = srv.online ? `🟢 Online (${srv.players} players)` : '🔴 Offline';
+                    const statusBadgeClass = srv.online ? 'status-badge online' : 'status-badge offline';
+                    const statusText = srv.online ? 'ONLINE' : 'OFFLINE';
                     
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 
@@ -427,7 +448,7 @@
                             <img src="${faviconSrc}" class="card-icon" alt="Icon">
                             <div>
                                 <h3 class="card-title">${srv.ip}</h3>
-                                <div class="${statusClass}">${statusText}</div>
+                                <div style="margin-top: 6px;"><span class="${statusBadgeClass}">${statusText}</span></div>
                                 <div class="card-version">${srv.version}</div>
                             </div>
                         </div>
@@ -447,6 +468,10 @@
 
                     renderChart(srv);
                 });
+
+                // Ripristina la posizione dello scroll esatta
+                window.scrollTo(0, currentScroll);
+
             } catch (e) {
                 console.error("Errore caricamento statistiche server", e);
             }

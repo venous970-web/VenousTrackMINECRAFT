@@ -1,372 +1,272 @@
-import sqlite3
-import time
-from flask import Flask, jsonify, request, render_template_string, session
-# Assicurati di avere mcstatus installato (pip install mcstatus)
-from mcstatus import JavaServer
-
-app = Flask(__name__)
-app.secret_key = "venous_track_secret_key_change_this"
-
-DB_NAME = "venous_track.db"
-
-# Inizializzazione del Database con salvataggio sicuro e tabelle per categorie
-def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Tabella per i server (con categoria: 'italiani' o 'generali')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS servers (
-            ip TEXT PRIMARY KEY,
-            category TEXT NOT NULL
-        )
-    ''')
-    
-    # Tabella per lo storico delle statistiche salvate
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS stats_history (
-            ip TEXT,
-            players INTEGER,
-            record INTEGER,
-            peak_72h INTEGER,
-            day_1 INTEGER,
-            day_2 INTEGER,
-            day_3 INTEGER,
-            version TEXT,
-            favicon TEXT,
-            online INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Funzione di utilità per interrogare il server Minecraft e salvare nel DB
-def update_and_save_servers():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT ip, category FROM servers")
-    servers = cursor.fetchall()
-    conn.close()
-
-    for ip, category in servers:
-        online = 0
-        players = 0
-        version = "Versione sconosciuta"
-        favicon = None
-        
-        try:
-            server = JavaServer.lookup(ip)
-            status = server.status()
-            online = 1
-            players = status.players.online
-            version = status.version.name
-            if hasattr(status, 'favicon') and status.favicon:
-                favicon = status.favicon
-        except Exception as e:
-            print(f"Impossibile raggiungere {ip}: {e}")
-            online = 0
-            players = 0
-
-        # Calcolo fittizio/reale storico
-        record = max(players, 50) 
-        peak_72h = max(players, 40)
-        day_1 = players
-        day_2 = max(0, players - 5)
-        day_3 = max(0, players - 10)
-
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO stats_history (ip, players, record, peak_72h, day_1, day_2, day_3, version, favicon, online)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (ip, players, record, peak_72h, day_1, day_2, day_3, version, favicon, online))
-        
-        conn.commit()
-        conn.close()
-
-# API per ottenere le statistiche divise per categoria
-@app.route('/api/stats/<category>')
-def get_stats(category):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT ip FROM servers WHERE category = ?", (category,))
-    server_rows = cursor.fetchall()
-    
-    result = []
-    for (ip,) in server_rows:
-        cursor.execute('''
-            SELECT players, record, peak_72h, day_1, day_2, day_3, version, favicon, online 
-            FROM stats_history WHERE ip = ? ORDER BY timestamp DESC LIMIT 1
-        ''', (ip,))
-        row = cursor.fetchone()
-        
-        if row:
-            players, record, peak_72h, day_1, day_2, day_3, version, favicon, online = row
-        else:
-            players, record, peak_72h, day_1, day_2, day_3, version, favicon, online = 0, 0, 0, 0, 0, 0, "N/D", None, 0
-
-        chart_labels = ["12:00", "15:00", "18:00", "21:00", "Oggi"]
-        chart_data = [max(0, players - 10), max(0, players - 5), players + 2, max(0, players - 2), players]
-
-        result.append({
-            "ip": ip,
-            "online": bool(online),
-            "players": players,
-            "record": record,
-            "peak_72h": peak_72h,
-            "day_1": day_1,
-            "day_2": day_2,
-            "day_3": day_3,
-            "version": version,
-            "favicon": favicon,
-            "chart_labels": chart_labels,
-            "chart_data": chart_data
-        })
-        
-    conn.close()
-    return jsonify(result)
-
-# Endpoint per aggiungere un server (riservato agli admin abilitati)
-@app.route('/api/servers/<category>', methods=['POST'])
-def add_server(category):
-    if not session.get('logged_in'):
-        return jsonify({"message": "Non autorizzato"}), 403
-    
-    data = request.get_json()
-    ip = data.get('ip')
-    if not ip:
-        return jsonify({"message": "IP non valido"}), 400
-        
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO servers (ip, category) VALUES (?, ?)", (ip, category))
-        conn.commit()
-        success = True
-    except sqlite3.IntegrityError:
-        success = False
-    conn.close()
-    
-    if success:
-        return jsonify({"message": "Server aggiunto con successo"})
-    return jsonify({"message": "Il server esiste già!"}), 400
-
-# Endpoint per eliminare un server
-@app.route('/api/servers/<category>', methods=['DELETE'])
-def delete_server(category):
-    if not session.get('logged_in') or session.get('username') != 'admin':
-        return jsonify({"message": "Non autorizzato"}), 403
-        
-    data = request.get_json()
-    ip = data.get('ip')
-    
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM servers WHERE ip = ?", (ip,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({"message": "Eliminato con successo"})
-
-# Sistema di Login Admin
-@app.route('/api/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
-    
-    if username == "admin" and password == "tua_password_sicura":
-        session['logged_in'] = True
-        session['username'] = username
-        return jsonify({"message": "Login effettuato con successo!"})
-    
-    return jsonify({"message": "Credenziali errate!"}), 401
-
-@app.route('/api/logout', methods=['POST'])
-def logout():
-    session.clear()
-    return jsonify({"message": "Logout eseguito"})
-
-@app.route('/api/auth')
-def auth_status():
-    logged = session.get('logged_in', False)
-    username = session.get('username', '')
-    
-    permissions = {
-        "add_italiano": True if logged else False,
-        "add_generale": True,
-        "delete_server": True if username == 'admin' else False
-    }
-    return jsonify({"logged_in": logged, "permissions": permissions})
-
-# HTML Principale integrato con lo stile pillola ONLINE/OFFLINE e blocco rimbalzo scroll
-@app.route('/')
-def index():
-    return render_template_string('''
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Venous Track</title>
-    <link rel="icon" type="image/png" href="/static/head.png">
+    <title>VenousTrack - Minecraft Server Statistics</title>
+    <!-- Chart.js per i grafici -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg-dark: #121212;
-            --bg-card: #1e1e1e;
-            --text-main: #ffffff;
-            --text-muted: #a0a0a0;
-            --accent-yellow: #ffc107;
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #ffc107;
             --accent-hover: #e0a800;
-            --red-delete: #dc3545;
+            --border-color: #2a2a2a;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
         }
 
         body {
-            margin: 0; padding: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-dark); color: var(--text-main);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
         }
 
-        #landing-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-color: var(--bg-dark); display: flex;
-            flex-direction: column; justify-content: center; align-items: center; z-index: 1000;
-        }
-
-        .landing-header { display: flex; align-items: center; gap: 15px; margin-bottom: 40px; }
-        .logo-icon, .card-icon { background: transparent !important; border-radius: 8px; object-fit: contain; }
-        .logo-icon { width: 48px; height: 48px; }
-        .landing-title { font-size: 2.5rem; margin: 0; }
-        .landing-buttons { display: flex; gap: 20px; flex-direction: column; align-items: center; }
-
-        .btn {
-            background-color: var(--accent-yellow); color: #000; border: none;
-            padding: 12px 28px; font-size: 1.1rem; font-weight: bold; border-radius: 8px;
-            cursor: pointer; transition: background 0.2s; width: 250px; text-align: center;
-        }
-        .btn:hover { background-color: var(--accent-hover); }
-
-        #login-form {
-            display: none; flex-direction: column; gap: 15px; margin-top: 20px;
-            background: var(--bg-card); padding: 20px; border-radius: 10px; width: 300px;
-        }
-        input { padding: 10px; border: 1px solid #333; background: #2a2a2a; color: white; border-radius: 6px; }
-
-        #main-app { display: none; }
         header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 30px; background-color: var(--bg-card); border-bottom: 1px solid #333;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .header-left { display: flex; align-items: center; gap: 15px; }
-        .header-right { display: flex; align-items: center; gap: 20px; }
-        .menu-btn { background: none; border: none; color: white; font-size: 1.8rem; cursor: pointer; }
 
-        .live-clock {
-            background: #2a2a2a; padding: 8px 15px; border-radius: 20px; font-size: 0.9rem;
-            display: flex; align-items: center; gap: 8px;
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-color);
         }
-        .live-dot { width: 10px; height: 10px; background-color: #28a745; border-radius: 50%; }
 
-        #side-menu {
-            position: fixed; top: 0; left: -250px; width: 250px; height: 100%;
-            background-color: var(--bg-card); border-right: 1px solid #333;
-            transition: 0.3s; z-index: 500; padding-top: 20px; display: flex; flex-direction: column; gap: 10px;
+        .user-panel {
+            display: flex;
+            align-items: center;
+            gap: 15px;
         }
-        #side-menu.open { left: 0; }
-        .menu-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #333; }
-        .menu-item { background: none; border: none; color: white; font-size: 1.1rem; padding: 15px 20px; text-align: left; cursor: pointer; width: 100%; }
-        .menu-item:hover { background: #333; }
 
-        .container { padding: 30px; max-width: 1200px; margin: auto; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
-        .card { background: var(--bg-card); border-radius: 12px; padding: 20px; position: relative; }
-        .card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-        .card-icon { width: 48px; height: 48px; }
-        .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; display: flex; align-items: center; }
-        .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
-        
+        button, .tab-btn {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover, .tab-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-color);
+            color: #000;
+            border-color: var(--accent-color);
+        }
+
+        .controls-bar {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 25px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"], input[type="password"] {
+            background-color: #2a2a2a;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 4px;
+            flex-grow: 1;
+            max-width: 300px;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 4px;
+            object-fit: contain;
+            background-color: #2a2a2a;
+        }
+
+        .card-title {
+            margin: 0;
+            font-size: 1.1rem;
+            word-break: break-all;
+        }
+
         .status-badge {
             display: inline-block;
-            padding: 4px 14px;
-            font-size: 0.85rem;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            border-radius: 12px;
             font-weight: bold;
-            border-radius: 20px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .status-badge.online {
-            background-color: #198754;
-            color: #75b798;
-            border: 1px solid #28a745;
-        }
-        .status-badge.offline {
-            background-color: #5c1d23;
-            color: #ea868f;
-            border: 1px solid #dc3545;
         }
 
-        .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
-        .delete-btn { position: absolute; top: 15px; right: 15px; background: var(--red-delete); color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; display: none; }
-        
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 15px; margin-bottom: 20px; font-size: 0.85rem; color: var(--text-muted); }
-        .stats-grid div { display: flex; flex-direction: column; }
-        .stats-grid strong { color: var(--accent-yellow); font-size: 1.1rem; margin-top: 2px; font-weight: bold; }
-        .chart-container { position: relative; width: 100%; height: 130px; }
-        canvas { width: 100% !important; height: 130px !important; }
+        .status-badge.online {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: var(--success-color);
+        }
+
+        .status-badge.offline {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: var(--danger-color);
+        }
+
+        .card-version {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-size: 0.9rem;
+            background-color: #161616;
+            padding: 10px;
+            border-radius: 6px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 120px;
+            width: 100%;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .delete-btn:hover {
+            background-color: var(--danger-color);
+            color: #fff;
+        }
+
+        .rank-badge {
+            font-weight: bold;
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        /* Modal di Login */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="landing-screen">
-        <div class="landing-header">
-            <h1 class="landing-title">Venous Track</h1>
+    <header>
+        <div class="logo">⚡ VenousTrack</div>
+        <div class="user-panel" id="user-panel">
+            <span id="username-display">Ospite</span>
+            <button id="auth-btn" onclick="openLoginModal()">Login</button>
         </div>
-        <div class="landing-buttons">
-            <button class="btn" onclick="enterApp('italiani')">Accedi (Default)</button>
-            <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login Admin</button>
+    </header>
+
+    <div class="container">
+        <!-- Tabs Categorie -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="tab-italiani" onclick="switchCategory('italiani')">Server Italiani</button>
+            <button class="tab-btn" id="tab-generali" onclick="switchCategory('generali')">Server Generali</button>
         </div>
-        <div id="login-form">
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
-            <button class="btn" onclick="performLogin()" style="width: 100%;">Conferma Login</button>
+
+        <!-- Barra di controllo aggiunta server -->
+        <div class="controls-bar" id="controls-bar" style="display: none;">
+            <input type="text" id="server-ip-input" placeholder="Inserisci IP server (es. play.server.it)">
+            <button onclick="addServer()">Aggiungi Server</button>
+        </div>
+
+        <!-- Griglia dei Server -->
+        <div class="servers-grid" id="servers-grid">
+            <!-- Popolato via JS -->
         </div>
     </div>
 
-    <div id="main-app">
-        <header>
-            <div class="header-left">
-                <button class="menu-btn" onclick="toggleMenu()">☰</button>
-                <h2 id="category-title" style="margin:0;">Server Italiani</h2>
-            </div>
-            <div class="header-right">
-                <div class="live-clock">
-                    <div class="live-dot"></div>
-                    <span id="clock">--:--:--</span>
-                </div>
-                <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem; width: auto;">➕ Aggiungi</button>
-                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555; width: auto;">Logout</button>
-            </div>
-        </header>
-
-        <div id="side-menu">
-            <div class="menu-header">
-                <h3 style="margin:0;">Menu</h3>
-                <button class="menu-btn" onclick="toggleMenu()" style="font-size: 1.4rem;">✕</button>
-            </div>
-            <button class="menu-item" onclick="switchCategory('italiani')">🇮🇹 Server Italiani</button>
-            <button class="menu-item" onclick="switchCategory('generali')">🌐 Server Generali</button>
-            <button class="menu-item" onclick="goHome()">🏠 Home</button>
-        </div>
-
-        <div class="container">
-            <div class="grid" id="servers-grid"></div>
+    <!-- Modal Login -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <h3>Login Amministratore</h3>
+            <input type="text" id="login-username" placeholder="Username">
+            <input type="password" id="login-password" placeholder="Password">
+            <button onclick="performLogin()">Accedi</button>
+            <button style="background-color: #444; color: #fff;" onclick="closeLoginModal()">Annulla</button>
         </div>
     </div>
 
@@ -374,62 +274,51 @@ def index():
         let currentCategory = 'italiani';
         let userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
         let chartsInstances = {};
+        let isLogged = false;
 
-        function updateClock() {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('it-IT');
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth');
+                const data = await res.json();
+                isLogged = data.logged_in;
+                userPermissions = data.permissions;
+                
+                const userDisplay = document.getElementById('username-display');
+                const authBtn = document.getElementById('auth-btn');
+                const controlsBar = document.getElementById('controls-bar');
+
+                if (isLogged) {
+                    userDisplay.innerText = data.username;
+                    authBtn.innerText = 'Logout';
+                    authBtn.onclick = performLogout;
+                } else {
+                    userDisplay.innerText = 'Ospite';
+                    authBtn.innerText = 'Login';
+                    authBtn.onclick = openLoginModal;
+                }
+
+                // Mostra/Nascondi barra aggiunta in base ai permessi
+                updateControlsVisibility();
+            } catch (e) {
+                console.error("Errore controllo auth:", e);
+            }
         }
-        setInterval(updateClock, 1000);
-        updateClock();
 
-        function toggleMenu() { document.getElementById('side-menu').classList.toggle('open'); }
-        function toggleLoginBox() { const b = document.getElementById('login-form'); b.style.display = b.style.display === 'flex' ? 'none' : 'flex'; }
-
-        function enterApp(cat) {
-            currentCategory = cat;
-            document.getElementById('landing-screen').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('category-title').innerText = cat === 'italiani' ? 'Server Italiani' : 'Server Generali';
-            checkAuthStatus();
-            loadServersStats();
-            setInterval(loadServersStats, 5000);
+        function updateControlsVisibility() {
+            const controlsBar = document.getElementById('controls-bar');
+            let canAdd = false;
+            if (currentCategory === 'italiani' && userPermissions.add_italiano) canAdd = true;
+            if (currentCategory === 'generali' && userPermissions.add_generale) canAdd = true;
+            
+            controlsBar.style.display = canAdd ? 'flex' : 'none';
         }
 
         function switchCategory(cat) {
             currentCategory = cat;
-            document.getElementById('category-title').innerText = cat === 'italiani' ? 'Server Italiani' : 'Server Generali';
-            toggleMenu();
-            checkAuthStatus();
+            document.getElementById('tab-italiani').className = cat === 'italiani' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-generali').className = cat === 'generali' ? 'tab-btn active' : 'tab-btn';
+            updateControlsVisibility();
             loadServersStats();
-        }
-
-        function goHome() {
-            document.getElementById('main-app').style.display = 'none';
-            document.getElementById('landing-screen').style.display = 'flex';
-            document.getElementById('side-menu').classList.remove('open');
-        }
-
-        async function checkAuthStatus() {
-            try {
-                const res = await fetch('/api/auth');
-                const data = await res.json();
-                userPermissions = data.permissions;
-                document.getElementById('logout-btn').style.display = data.logged_in ? 'block' : 'none';
-                const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
-                document.getElementById('add-server-header-btn').style.display = canAdd ? 'block' : 'none';
-            } catch (e) { console.error(e); }
-        }
-
-        async function performLogin() {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
-            const data = await res.json();
-            if (res.ok) { alert(data.message); enterApp('italiani'); } else { alert(data.message); }
-        }
-
-        async function performLogout() {
-            await fetch('/api/logout', { method: 'POST' });
-            goHome();
         }
 
         async function loadServersStats() {
@@ -437,7 +326,7 @@ def index():
                 const res = await fetch(`/api/stats/${currentCategory}`);
                 const servers = await res.json();
                 
-                // 1. SALVIAMO LA POSIZIONE ATTUALE DELLO SCROLL PRIMA DI RIGENERARE IL DOM
+                // SALVIAMO LA POSIZIONE ATTUALE DELLO SCROLL PRIMA DI RIGENERARE IL DOM
                 const currentScroll = window.scrollY;
 
                 const grid = document.getElementById('servers-grid');
@@ -503,28 +392,82 @@ def index():
                     });
                 });
 
-                // 2. RIPRISTINIAMO ESATTAMENTE LA POSIZIONE DELLO SCROLL
+                // RIPRISTINIAMO ESATTAMENTE DOVE ERA L'UTENTE
                 window.scrollTo(0, currentScroll);
 
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e); 
+            }
         }
 
-        async function promptAddServer() {
-            const ip = prompt("IP del server:");
+        async function addServer() {
+            const input = document.getElementById('server-ip-input');
+            const ip = input.value.trim();
             if (!ip) return;
-            await fetch(`/api/servers/${currentCategory}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
-            loadServersStats();
+
+            const res = await fetch(`/api/servers/${currentCategory}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                input.value = '';
+                loadServersStats();
+            } else {
+                alert(data.message || 'Errore durante l\'aggiunta');
+            }
         }
 
         async function deleteServer(ip) {
-            if (!confirm(`Eliminare ${ip}?`)) return;
-            await fetch(`/api/servers/${currentCategory}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) });
-            loadServersStats();
+            if (!confirm(`Sei sicuro di voler eliminare ${ip}?`)) return;
+
+            const res = await fetch(`/api/servers/${currentCategory}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                loadServersStats();
+            } else {
+                alert(data.message || 'Errore durante l\'eliminazione');
+            }
         }
+
+        function openLoginModal() { document.getElementById('login-modal').style.display = 'flex'; }
+        function closeLoginModal() { document.getElementById('login-modal').style.display = 'none'; }
+
+        async function performLogin() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                closeLoginModal();
+                checkAuth().then(() => loadServersStats());
+            } else {
+                alert(data.message);
+            }
+        }
+
+        async function performLogout() {
+            await fetch('/api/logout', { method: 'POST' });
+            checkAuth().then(() => loadServersStats());
+        }
+
+        // Init
+        window.onload = async () => {
+            await checkAuth();
+            loadServersStats();
+            // Aggiorna automaticamente ogni 5 secondi senza rimbalzi in alto
+            setInterval(loadServersStats, 5000);
+        };
     </script>
 </body>
 </html>
-''')
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)

@@ -359,6 +359,28 @@ def handle_servers():
         if ip and ip not in servers_list:
             servers_list.append(ip)
             save_servers(servers_list)
+            
+            # FIX: Appena aggiunto, facciamo un ping immediato e salviamo la prima entry nel DB
+            # così evitiamo che 1/2/3 days e record rimangano vuoti finché il background loop non gira
+            status, _ = query_minecraft_server(ip)
+            if status is not None:
+                players = getattr(status.players, "online", 0)
+                max_p = getattr(status.players, "max", 0)
+                SERVER_STATES[ip] = {
+                    "ip": ip,
+                    "online": True,
+                    "players": players,
+                    "max": max_p,
+                    "version": status.version.name if hasattr(status, "version") and hasattr(status.version, "name") else "1.7.x - 1.21.x",
+                    "favicon": getattr(status, "favicon", getattr(status, "icon", None)),
+                    "fail_count": 0
+                }
+                conn = sqlite3.connect(DB_FILE)
+                c = conn.cursor()
+                c.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, int(time.time()), players, max_p))
+                conn.commit()
+                conn.close()
+
             return jsonify({"status": "success", "servers": servers_list})
         return (
             jsonify({"status": "error", "message": "IP non valido o già presente"}),
@@ -371,7 +393,6 @@ def handle_servers():
         if ip in servers_list:
             servers_list.remove(ip)
             save_servers(servers_list)
-            # Rimuoviamo anche lo stato in memoria del server eliminato
             if ip in SERVER_STATES:
                 del SERVER_STATES[ip]
             return jsonify({"status": "success", "servers": servers_list})

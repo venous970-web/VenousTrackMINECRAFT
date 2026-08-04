@@ -45,11 +45,14 @@
         }
 
         /* Trasparenza assoluta garantita per l'icona 64x64 */
+        .logo-icon, .card-icon {
+            background: transparent !important;
+            border-radius: 8px;
+        }
+
         .logo-icon {
             width: 48px;
             height: 48px;
-            background: transparent !important;
-            border-radius: 8px;
         }
 
         .landing-title {
@@ -177,21 +180,37 @@
             position: relative;
         }
         .card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
-        .card-icon { width: 48px; height: 48px; border-radius: 8px; background: transparent !important; }
+        .card-icon { width: 48px; height: 48px; }
         .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; }
-        .card-status { font-size: 0.9rem; color: #28a745; }
+        .card-status { font-size: 0.95rem; color: #28a745; font-weight: 500; }
         .card-status.offline { color: var(--red-delete); }
+        .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        
         .delete-btn {
             position: absolute; top: 15px; right: 15px;
             background: var(--red-delete); color: white;
             border: none; padding: 5px 10px; border-radius: 5px;
             cursor: pointer; display: none;
         }
+        
         .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-            margin-bottom: 15px; font-size: 0.9rem; color: var(--text-muted);
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px;
+            margin-bottom: 20px; 
+            font-size: 0.85rem; 
+            color: var(--text-muted);
         }
-        .stats-grid strong { color: white; display: block; font-size: 1rem;}
+        
+        /* Stile migliorato per i numeri: grandi e gialli */
+        .stats-grid strong { 
+            color: var(--accent-yellow); 
+            display: block; 
+            font-size: 1.3rem;
+            margin-top: 4px;
+            font-weight: bold;
+        }
+        
         canvas { max-width: 100%; height: 120px !important; }
     </style>
 </head>
@@ -372,7 +391,6 @@
         function renderCards(servers) {
             const grid = document.getElementById('servers-grid');
             
-            // Se ci sono server che non sono più in lista, eliminiamo le loro card/chart
             const activeIps = servers.map(s => s.ip);
             Array.from(grid.children).forEach(child => {
                 if(!activeIps.includes(child.dataset.ip)) {
@@ -399,13 +417,16 @@
                             <div>
                                 <h3 class="card-title">${srv.ip}</h3>
                                 <div class="card-status" id="status-${srv.ip}">Aggiornamento...</div>
+                                <div class="card-version" id="version-${srv.ip}">-</div>
                             </div>
                         </div>
                         <div class="stats-grid">
                             <div>Live Players <strong id="players-${srv.ip}">-</strong></div>
-                            <div>Record (Sempre) <strong id="record-${srv.ip}">-</strong></div>
+                            <div>Record <strong id="record-${srv.ip}">-</strong></div>
                             <div>Picco 72h <strong id="peak-${srv.ip}">-</strong></div>
-                            <div>-1 Giorno <strong id="day1-${srv.ip}">-</strong></div>
+                            <div>1 day ago <strong id="day1-${srv.ip}">-</strong></div>
+                            <div>2 day ago <strong id="day2-${srv.ip}">-</strong></div>
+                            <div>3 day ago <strong id="day3-${srv.ip}">-</strong></div>
                         </div>
                         <canvas id="chart-${srv.ip}"></canvas>
                     `;
@@ -413,7 +434,7 @@
                 }
 
                 // Aggiornamento dati DOM
-                const iconSrc = srv.favicon || "https://i.imgur.com/2ZQbK1k.png"; // Placeholder trasparente se manca
+                const iconSrc = srv.favicon || "https://i.imgur.com/2ZQbK1k.png"; 
                 document.getElementById(`icon-${srv.ip}`).src = iconSrc;
                 
                 const statusEl = document.getElementById(`status-${srv.ip}`);
@@ -425,12 +446,15 @@
                     statusEl.className = "card-status offline";
                 }
 
-                document.getElementById(`players-${srv.ip}`).innerText = `${srv.players} / ${srv.max}`;
+                document.getElementById(`version-${srv.ip}`).innerText = srv.version || "Sconosciuta";
+                document.getElementById(`players-${srv.ip}`).innerText = srv.players;
                 document.getElementById(`record-${srv.ip}`).innerText = srv.record || "-";
                 document.getElementById(`peak-${srv.ip}`).innerText = srv.peak_72h || "-";
                 document.getElementById(`day1-${srv.ip}`).innerText = srv.day_1 || "-";
+                document.getElementById(`day2-${srv.ip}`).innerText = srv.day_2 || "-";
+                document.getElementById(`day3-${srv.ip}`).innerText = srv.day_3 || "-";
 
-                // Gestione Grafico Chart.js - RIMASTO INATTO
+                // Gestione Grafico Chart.js INTATTO come richiesto
                 const ctx = document.getElementById(`chart-${srv.ip}`).getContext('2d');
                 if (!charts[srv.ip]) {
                     charts[srv.ip] = new Chart(ctx, {
@@ -471,7 +495,7 @@
             });
         }
 
-        // All'avvio, controlliamo la sessione in automatico dal server in background
+        // All'avvio, controlliamo la sessione
         fetch('/api/auth')
             .then(res => res.json())
             .then(data => {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Venous Track</title>
-    <!-- Favicon del browser con la tua icona -->
+    <!-- Favicon del browser -->
     <link rel="icon" type="image/png" href="https://i.imgur.com/2ZQbK1k.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -48,6 +48,7 @@
         .logo-icon, .card-icon {
             background: transparent !important;
             border-radius: 8px;
+            object-fit: contain;
         }
 
         .logo-icon {
@@ -87,6 +88,7 @@
             background: var(--bg-card);
             padding: 20px;
             border-radius: 10px;
+            width: 300px;
         }
 
         input {
@@ -210,7 +212,6 @@
             font-weight: bold;
         }
         
-        /* Contenitore rigido per adattare perfettamente il grafico alle dimensioni della card senza distorsioni */
         .chart-container {
             position: relative;
             width: 100%;
@@ -223,3 +224,290 @@
         }
     </style>
 </head>
+<body>
+
+    <!-- Schermata iniziale -->
+    <div id="landing-screen">
+        <div class="landing-header">
+            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Logo" class="logo-icon">
+            <h1 class="landing-title">Venous Track</h1>
+        </div>
+        <div class="landing-buttons" id="landing-buttons">
+            <button class="btn" onclick="enterApp('italiani') servers">Server Italiani</button>
+            <button class="btn" onclick="enterApp('generali')">Server Generali</button>
+            <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login</button>
+        </div>
+        <div id="login-form">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button class="btn" onclick="performLogin()">Accedi</button>
+        </div>
+    </div>
+
+    <!-- App Principale -->
+    <div id="main-app">
+        <header>
+            <div class="header-left">
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="https://i.imgur.com/2ZQbK1k.png" alt="Logo" class="logo-icon" style="width: 36px; height: 36px;">
+                    <h2 id="category-title" style="margin:0;">Server Italiani</h2>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="live-clock">
+                    <div class="live-dot"></div>
+                    <span id="clock">--:--:--</span>
+                </div>
+                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem;">Logout</button>
+            </div>
+        </header>
+
+        <!-- Menu laterale -->
+        <div id="side-menu">
+            <button class="menu-item" onclick="switchCategory('italiani')">🇮🇹 Server Italiani</button>
+            <button class="menu-item" onclick="switchCategory('generali')">🌐 Server Generali</button>
+            <button class="menu-item" id="add-server-menu-btn" onclick="promptAddServer()" style="display:none;">➕ Aggiungi Server</button>
+            <button class="menu-item" onclick="goHome()">🏠 Home</button>
+        </div>
+
+        <div class="container">
+            <div class="grid" id="servers-grid">
+                <!-- Le card dei server verranno caricate qui dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCategory = 'italiani';
+        let userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
+        let isLoggedIn = false;
+        let chartsInstances = {};
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('it-IT');
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function toggleMenu() {
+            document.getElementById('side-menu').classList.toggle('open');
+        }
+
+        function toggleLoginBox() {
+            const box = document.getElementById('login-form');
+            box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function enterApp(category) {
+            currentCategory = category;
+            document.getElementById('landing-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('category-title').innerText = category === 'italiani' ? 'Server Italiani' : 'Server Generali';
+            checkAuthStatus();
+            loadServersStats();
+            setInterval(loadServersStats, 5000);
+        }
+
+        function switchCategory(category) {
+            currentCategory = category;
+            document.getElementById('category-title').innerText = category === 'italiani' ? 'Server Italiani' : 'Server Generali';
+            toggleMenu();
+            loadServersStats();
+        }
+
+        function goHome() {
+            document.getElementById('main-app').style.display = 'none';
+            document.getElementById('landing-screen').style.display = 'flex';
+            document.getElementById('side-menu').classList.remove('open');
+        }
+
+        async function checkAuthStatus() {
+            try {
+                const res = await fetch('/api/auth');
+                const data = await res.json();
+                isLoggedIn = data.logged_in;
+                userPermissions = data.permissions;
+                
+                if (isLoggedIn) {
+                    document.getElementById('logout-btn').style.display = 'block';
+                } else {
+                    document.getElementById('logout-btn').style.display = 'none';
+                }
+
+                const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
+                if (canAdd || userPermissions.delete_server) {
+                    document.getElementById('add-server-menu-btn').style.display = 'block';
+                } else {
+                    document.getElementById('add-server-menu-btn').style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Errore verifica auth", e);
+            }
+        }
+
+        async function performLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: u, password: p })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    enterApp('italiani');
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore di connessione durante il login");
+            }
+        }
+
+        async function performLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                isLoggedIn = false;
+                userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
+                alert("Logout effettuato");
+                goHome();
+            } catch (e) {
+                console.error("Errore logout", e);
+            }
+        }
+
+        async function loadServersStats() {
+            try {
+                const res = await fetch(`/api/stats/${currentCategory}`);
+                const servers = await res.json();
+                const grid = document.getElementById('servers-grid');
+                
+                // Mantieni traccia degli IP esistenti per aggiornare senza ricreare tutto se possibile
+                grid.innerHTML = '';
+
+                servers.forEach((srv, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    
+                    const faviconSrc = srv.favicon || 'https://i.imgur.com/2ZQbK1k.png';
+                    const statusClass = srv.online ? 'card-status' : 'card-status offline';
+                    const statusText = srv.online ? `🟢 Online (${srv.players}/${srv.max})` : '🔴 Offline';
+                    
+                    const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
+
+                    card.innerHTML = `
+                        <button class="delete-btn" style="${showDelete}" onclick="deleteServer('${srv.ip}')">Elimina</button>
+                        <div class="card-header">
+                            <span class="rank-badge">#${index + 1}</span>
+                            <img src="${faviconSrc}" class="card-icon" alt="Icon">
+                            <div>
+                                <h3 class="card-title">${srv.ip}</h3>
+                                <div class="${statusClass}">${statusText}</div>
+                                <div class="card-version">${srv.version}</div>
+                            </div>
+                        </div>
+                        <div class="stats-grid">
+                            <div>Picco 72h:<strong>${srv.peak_72h}</strong></div>
+                            <div>Record:<strong>${srv.record}</strong></div>
+                            <div>Ieri:<strong>${srv.day_1}</strong></div>
+                            <div>2 Giorni Fa:<strong>${srv.day_2}</strong></div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}"></canvas>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+
+                    renderChart(srv);
+                });
+            } catch (e) {
+                console.error("Errore caricamento statistiche server", e);
+            }
+        }
+
+        function renderChart(srv) {
+            const canvasId = `chart-${srv.ip.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            if (chartsInstances[canvasId]) {
+                chartsInstances[canvasId].destroy();
+            }
+
+            chartsInstances[canvasId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: srv.chart_labels,
+                    datasets: [{
+                        data: srv.chart_data,
+                        borderColor: '#ffc107',
+                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            display: true, 
+                            grid: { color: '#2a2a2a' },
+                            ticks: { color: '#a0a0a0', font: { size: 10 }, maxTicksLimit: 4 }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function promptAddServer() {
+            const ip = prompt("Inserisci l'indirizzo IP del server Minecraft:");
+            if (!ip) return;
+            try {
+                const res = await fetch(`/api/servers/${currentCategory}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("Server aggiunto con successo!");
+                    loadServersStats();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore durante l'aggiunta del server");
+            }
+        }
+
+        async function deleteServer(ip) {
+            if (!confirm(`Sei sicuro di voler eliminare il server ${ip}?`)) return;
+            try {
+                const res = await fetch(`/api/servers/${currentCategory}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert("Server eliminato");
+                    loadServersStats();
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                alert("Errore durante l'eliminazione");
+            }
+        }
+    </script>
+</body>
+</html>

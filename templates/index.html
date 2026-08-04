@@ -71,14 +71,13 @@ def update_and_save_servers():
             online = 0
             players = 0
 
-        # Calcolo fittizio/reale storico (puoi espandere la logica dei record qui)
+        # Calcolo fittizio/reale storico
         record = max(players, 50) 
         peak_72h = max(players, 40)
         day_1 = players
         day_2 = max(0, players - 5)
         day_3 = max(0, players - 10)
 
-        # CONNESSIONE E SCRITTURA CON COMMIT OBBLIGATORIO PER AGGIORNARE IL DB
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
@@ -87,7 +86,6 @@ def update_and_save_servers():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (ip, players, record, peak_72h, day_1, day_2, day_3, version, favicon, online))
         
-        # SALVATAGGIO FISICO SU DISCO DEL FILE .DB
         conn.commit()
         conn.close()
 
@@ -102,7 +100,6 @@ def get_stats(category):
     
     result = []
     for (ip,) in server_rows:
-        # Prendi l'ultimo record salvato per ciascun IP
         cursor.execute('''
             SELECT players, record, peak_72h, day_1, day_2, day_3, version, favicon, online 
             FROM stats_history WHERE ip = ? ORDER BY timestamp DESC LIMIT 1
@@ -114,7 +111,6 @@ def get_stats(category):
         else:
             players, record, peak_72h, day_1, day_2, day_3, version, favicon, online = 0, 0, 0, 0, 0, 0, "N/D", None, 0
 
-        # Genera dati fittizi per il grafico lineare
         chart_labels = ["12:00", "15:00", "18:00", "21:00", "Oggi"]
         chart_data = [max(0, players - 10), max(0, players - 5), players + 2, max(0, players - 2), players]
 
@@ -185,7 +181,6 @@ def login():
     username = data.get('username')
     password = data.get('password')
     
-    # Esempio credenziali admin (modificali a piacimento)
     if username == "admin" and password == "tua_password_sicura":
         session['logged_in'] = True
         session['username'] = username
@@ -203,7 +198,6 @@ def auth_status():
     logged = session.get('logged_in', False)
     username = session.get('username', '')
     
-    # Permessi personalizzati in base all'utente loggato o default
     permissions = {
         "add_italiano": True if logged else False,
         "add_generale": True,
@@ -211,7 +205,7 @@ def auth_status():
     }
     return jsonify({"logged_in": logged, "permissions": permissions})
 
-# HTML Principale integrato con lo stile pillola ONLINE/OFFLINE richiesto
+# HTML Principale integrato con lo stile pillola ONLINE/OFFLINE e blocco rimbalzo scroll
 @app.route('/')
 def index():
     return render_template_string('''
@@ -298,7 +292,6 @@ def index():
         .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; display: flex; align-items: center; }
         .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
         
-        /* STILE PILLOLA ONLINE / OFFLINE RICHIESTO */
         .status-badge {
             display: inline-block;
             padding: 4px 14px;
@@ -443,6 +436,10 @@ def index():
             try {
                 const res = await fetch(`/api/stats/${currentCategory}`);
                 const servers = await res.json();
+                
+                // 1. SALVIAMO LA POSIZIONE ATTUALE DELLO SCROLL PRIMA DI RIGENERARE IL DOM
+                const currentScroll = window.scrollY;
+
                 const grid = document.getElementById('servers-grid');
                 grid.innerHTML = '';
 
@@ -451,7 +448,6 @@ def index():
                     card.className = 'card';
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
-                    // Applicazione dello stile pillola in base allo stato online/offline
                     const statusBadgeClass = srv.online ? 'status-badge online' : 'status-badge offline';
                     const statusText = srv.online ? 'ONLINE' : 'OFFLINE';
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
@@ -506,6 +502,10 @@ def index():
                         }
                     });
                 });
+
+                // 2. RIPRISTINIAMO ESATTAMENTE LA POSIZIONE DELLO SCROLL
+                window.scrollTo(0, currentScroll);
+
             } catch (e) { console.error(e); }
         }
 
@@ -527,5 +527,4 @@ def index():
 ''')
 
 if __name__ == '__main__':
-    # Esegui in background o avvia l'app Flask
     app.run(debug=True, port=5000)

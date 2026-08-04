@@ -15,18 +15,17 @@ import requests
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-# Chiave segreta per le sessioni di login (impostala su Render come env var, o usa questa di default)
+# Chiave segreta per le sessioni di login
 app.secret_key = os.environ.get("SECRET_KEY", "chiave-super-segreta-venous970")
 
-# Database separati per ripartire da zero
+# Database separati: il generale usa il tuo vecchio db storico, l'italiano riparte da zero
 DB_ITA = "venous_track_ita.db"
-DB_GEN = "venous_track_gen.db"
+DB_GEN = "venous_track.db" 
 CONFIG_FILE = "servers.json"
 USERS_FILE = "users.json"
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
-# La password sicura va messa nelle variabili d'ambiente di Render!
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "metti_qui_la_password_provvisoria")
 
 SERVER_STATES = {}
@@ -100,7 +99,6 @@ def load_servers_from_github():
             if content_b64:
                 decoded = base64.b64decode(content_b64).decode("utf-8")
                 data = json.loads(decoded)
-                # Migrazione automatica se il file su GitHub è ancora una lista e non un dizionario
                 if isinstance(data, list):
                     return {"italiani": [], "generali": data}
                 return data
@@ -361,7 +359,6 @@ def handle_servers(category):
         ip = data.get("ip", "").strip()
         
         if ip and ip not in servers_data[category]:
-            # Rimuove l'IP dall'altra categoria se esiste, per evitare duplicati globali
             other_cat = "generali" if category == "italiani" else "italiani"
             if ip in servers_data[other_cat]:
                 servers_data[other_cat].remove(ip)
@@ -369,7 +366,6 @@ def handle_servers(category):
             servers_data[category].append(ip)
             save_servers(servers_data)
             
-            # Primo Ping Immediato per non perdere la sezione Record
             status, _ = query_minecraft_server(ip)
             if status is not None:
                 players = getattr(status.players, "online", 0)
@@ -409,7 +405,7 @@ def handle_servers(category):
 @app.route("/api/stats/<category>", methods=["GET"])
 def get_stats(category):
     if category not in ["italiani", "generali"]:
-        return jsonify({"status": "error", "message": "Categoria non valida"}), 400
+        return jsonify({"status": "error", "message": "Categoria non valida"}), 0
 
     full_results = []
     for ip in servers_data.get(category, []):

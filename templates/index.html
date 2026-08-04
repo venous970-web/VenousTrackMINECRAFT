@@ -416,7 +416,9 @@
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
                     const statusClass = srv.online ? 'card-status' : 'card-status offline';
-                    const statusText = srv.online ? `🟢 Online (${srv.players} players)` : '🔴 Offline';
+                    
+                    // Mostra solo lo stato pulito (Online / Offline) senza il conteggio giocatori sotto al titolo
+                    const statusText = srv.online ? '🟢 Online' : '🔴 Offline';
                     
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 

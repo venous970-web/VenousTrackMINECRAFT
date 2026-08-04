@@ -64,18 +64,22 @@
         .landing-buttons {
             display: flex;
             gap: 20px;
+            flex-direction: column;
+            align-items: center;
         }
 
         .btn {
             background-color: var(--accent-yellow);
             color: #000;
             border: none;
-            padding: 10px 24px;
+            padding: 12px 28px;
             font-size: 1.1rem;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
+            width: 250px;
+            text-align: center;
         }
 
         .btn:hover { background-color: var(--accent-hover); }
@@ -236,21 +240,20 @@
 </head>
 <body>
 
-    <!-- Schermata iniziale -->
+    <!-- Schermata iniziale con Account Default e Login -->
     <div id="landing-screen">
         <div class="landing-header">
             <img src="/static/head.png" alt="Logo" class="logo-icon">
             <h1 class="landing-title">Venous Track</h1>
         </div>
         <div class="landing-buttons" id="landing-buttons">
-            <button class="btn" onclick="enterApp('italiani')">Server Italiani</button>
-            <button class="btn" onclick="enterApp('generali')">Server Generali</button>
-            <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login</button>
+            <button class="btn" onclick="enterApp('italiani')">Accedi (Default)</button>
+            <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login Admin</button>
         </div>
         <div id="login-form">
             <input type="text" id="username" placeholder="Username">
             <input type="password" id="password" placeholder="Password">
-            <button class="btn" onclick="performLogin()">Accedi</button>
+            <button class="btn" onclick="performLogin()" style="width: 100%;">Conferma Login</button>
         </div>
     </div>
 
@@ -269,14 +272,14 @@
                     <div class="live-dot"></div>
                     <span id="clock">--:--:--</span>
                 </div>
-                <!-- Tasto Aggiungi Server spostato nell'header (visibile solo se abilitato) -->
-                <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem;">➕ Aggiungi Server</button>
+                <!-- Tasto Aggiungi Server (visibile solo in Generali per default o se autorizzato) -->
+                <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem; width: auto;">➕ Aggiungi Server</button>
                 <!-- Tasto Logout -->
-                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555;">Logout</button>
+                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555; width: auto;">Logout</button>
             </div>
         </header>
 
-        <!-- Menu laterale corretto con tasto di chiusura -->
+        <!-- Menu laterale -->
         <div id="side-menu">
             <div class="menu-header">
                 <h3 style="margin:0;">Menu</h3>
@@ -353,7 +356,7 @@
                     document.getElementById('logout-btn').style.display = 'none';
                 }
 
-                // Logica permessi: Aggiungi server abilitato solo se i permessi lo consentono E ci si trova nella categoria corretta (es. Generali per default)
+                // Aggiungi server abilitato solo se i permessi lo consentono E ci si trova nella categoria corretta
                 const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
                 if (canAdd) {
                     document.getElementById('add-server-header-btn').style.display = 'block';
@@ -414,7 +417,6 @@
                     const statusClass = srv.online ? 'card-status' : 'card-status offline';
                     const statusText = srv.online ? '🟢 Online' : '🔴 Offline';
                     
-                    // Mostra il tasto elimina solo se l'utente ha i permessi specifici di eliminazione
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 
                     card.innerHTML = `

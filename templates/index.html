@@ -44,7 +44,6 @@
             margin-bottom: 40px;
         }
 
-        /* Trasparenza assoluta garantita per l'icona 64x64 */
         .logo-icon, .card-icon {
             background: transparent !important;
             border-radius: 8px;
@@ -181,7 +180,11 @@
         }
         .card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
         .card-icon { width: 48px; height: 48px; }
-        .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; }
+        .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; display: flex; align-items: center; }
+        
+        /* Stile del Rank #1, #2... */
+        .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
+        
         .card-status { font-size: 0.95rem; color: #28a745; font-weight: 500; }
         .card-status.offline { color: var(--red-delete); }
         .card-version { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
@@ -202,7 +205,6 @@
             color: var(--text-muted);
         }
         
-        /* Stile migliorato per i numeri: grandi e gialli */
         .stats-grid strong { 
             color: var(--accent-yellow); 
             display: block; 
@@ -211,7 +213,8 @@
             font-weight: bold;
         }
         
-        canvas { max-width: 100%; height: 120px !important; }
+        /* Aumentata l'altezza del grafico per non schiacciare i numeri */
+        canvas { max-width: 100%; height: 160px !important; }
     </style>
 </head>
 <body>
@@ -219,7 +222,7 @@
     <!-- SCHERMATA INIZIALE -->
     <div id="landing-screen">
         <div class="landing-header">
-            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon"> <!-- Sostituisci con il link alla tua icona -->
+            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon">
             <h1 class="landing-title">Venous Track</h1>
         </div>
         <div class="landing-buttons" id="landing-buttons">
@@ -279,12 +282,10 @@
         let updateInterval;
         let charts = {};
 
-        // --- GESTIONE OROLOGIO ---
         setInterval(() => {
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('it-IT');
         }, 1000);
 
-        // --- GESTIONE UI INIZIALE ---
         function showLogin() {
             document.getElementById('landing-buttons').style.display = 'none';
             document.getElementById('login-form').style.display = 'flex';
@@ -310,7 +311,7 @@
                 if (data.status === 'success') {
                     userPermissions = data.permissions;
                     isLoggedIn = true;
-                    enterApp('italiani'); // Se logga come admin lo porta agli italiani di default
+                    enterApp('italiani');
                 } else {
                     document.getElementById('login-error').style.display = 'block';
                 }
@@ -336,23 +337,20 @@
             
             document.getElementById('current-category-title').innerText = category === 'italiani' ? 'Tracker Italiano' : 'Tracker Generale';
             
-            // Gestione visibilità bottoni menu
             if (isLoggedIn) {
                 document.getElementById('menu-logout-btn').style.display = 'block';
                 document.getElementById('menu-login-btn').style.display = 'none';
             }
 
-            // Gestione visibilità Input Add Server
             const canAdd = (category === 'italiani' && userPermissions.add_italiano) || 
                            (category === 'generali' && userPermissions.add_generale);
             document.getElementById('add-server-ui').style.display = canAdd ? 'flex' : 'none';
 
             loadData();
             if(updateInterval) clearInterval(updateInterval);
-            updateInterval = setInterval(loadData, 5000); // 5 secondi
+            updateInterval = setInterval(loadData, 5000);
         }
 
-        // --- GESTIONE DATI API ---
         async function loadData() {
             try {
                 const res = await fetch(`/api/stats/${currentCategory}`);
@@ -387,20 +385,25 @@
             } catch (e) { alert("Errore eliminazione server"); }
         }
 
-        // --- RENDERING CARDS E GRAFICI ---
         function renderCards(servers) {
             const grid = document.getElementById('servers-grid');
             
+            // Pulizia delle card non più presenti nella categoria attuale
             const activeIps = servers.map(s => s.ip);
             Array.from(grid.children).forEach(child => {
                 if(!activeIps.includes(child.dataset.ip)) {
-                    if(charts[child.dataset.ip]) charts[child.dataset.ip].destroy();
+                    if(charts[child.dataset.ip]) {
+                        charts[child.dataset.ip].destroy();
+                        delete charts[child.dataset.ip];
+                    }
                     child.remove();
                 }
             });
 
-            servers.forEach(srv => {
+            // Iteriamo rispettando l'ordine dell'array (che è già ordinato per rank nel backend)
+            servers.forEach((srv, index) => {
                 let card = document.querySelector(`.card[data-ip="${srv.ip}"]`);
+                
                 if (!card) {
                     card = document.createElement('div');
                     card.className = 'card';
@@ -415,7 +418,10 @@
                         <div class="card-header">
                             <img class="card-icon" id="icon-${srv.ip}" src="">
                             <div>
-                                <h3 class="card-title">${srv.ip}</h3>
+                                <h3 class="card-title">
+                                    <span id="rank-${srv.ip}" class="rank-badge">#${index + 1}</span>
+                                    ${srv.ip}
+                                </h3>
                                 <div class="card-status" id="status-${srv.ip}">Aggiornamento...</div>
                                 <div class="card-version" id="version-${srv.ip}">-</div>
                             </div>
@@ -425,17 +431,21 @@
                             <div>Record <strong id="record-${srv.ip}">-</strong></div>
                             <div>Picco 72h <strong id="peak-${srv.ip}">-</strong></div>
                             <div>1 day ago <strong id="day1-${srv.ip}">-</strong></div>
-                            <div>2 day ago <strong id="day2-${srv.ip}">-</strong></div>
-                            <div>3 day ago <strong id="day3-${srv.ip}">-</strong></div>
+                            <div>2 days ago <strong id="day2-${srv.ip}">-</strong></div>
+                            <div>3 days ago <strong id="day3-${srv.ip}">-</strong></div>
                         </div>
                         <canvas id="chart-${srv.ip}"></canvas>
                     `;
-                    grid.appendChild(card);
                 }
+                
+                // Assicuriamoci che la card venga spostata alla giusta posizione nel DOM! 
+                // Questo risolve il bug di visibilità durante i cambi di categoria
+                grid.appendChild(card);
 
-                // Aggiornamento dati DOM
+                // Aggiornamento dati dinamici
                 const iconSrc = srv.favicon || "https://i.imgur.com/2ZQbK1k.png"; 
                 document.getElementById(`icon-${srv.ip}`).src = iconSrc;
+                document.getElementById(`rank-${srv.ip}`).innerText = `#${index + 1}`;
                 
                 const statusEl = document.getElementById(`status-${srv.ip}`);
                 if (srv.online) {
@@ -454,7 +464,7 @@
                 document.getElementById(`day2-${srv.ip}`).innerText = srv.day_2 || "-";
                 document.getElementById(`day3-${srv.ip}`).innerText = srv.day_3 || "-";
 
-                // Gestione Grafico Chart.js INTATTO come richiesto
+                // Gestione Grafico con tooltips abilitati
                 const ctx = document.getElementById(`chart-${srv.ip}`).getContext('2d');
                 if (!charts[srv.ip]) {
                     charts[srv.ip] = new Chart(ctx, {
@@ -468,21 +478,37 @@
                                 backgroundColor: 'rgba(255, 193, 7, 0.1)',
                                 borderWidth: 2,
                                 fill: true,
-                                tension: 0.3,
-                                pointRadius: 0
+                                tension: 0.3
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
                             animation: false,
-                            plugins: { legend: { display: false } },
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: { 
+                                legend: { display: false },
+                                tooltip: { enabled: true } // Abilitato l'hover con l'orario e numero
+                            },
+                            elements: {
+                                point: {
+                                    radius: 0,
+                                    hitRadius: 15, // Aumenta l'area tattile per mouse/touch
+                                    hoverRadius: 5
+                                }
+                            },
                             scales: {
                                 x: { display: false },
                                 y: { 
                                     display: true, 
                                     grid: { color: '#333' },
-                                    ticks: { color: '#a0a0a0' }
+                                    ticks: { 
+                                        color: '#a0a0a0',
+                                        maxTicksLimit: 5 // Limita le righe per non ammassare i numeri
+                                    }
                                 }
                             }
                         }
@@ -495,7 +521,6 @@
             });
         }
 
-        // All'avvio, controlliamo la sessione
         fetch('/api/auth')
             .then(res => res.json())
             .then(data => {

@@ -6,402 +6,481 @@
     <title>Venous Track</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --bg-dark: #121212;
+            --bg-card: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --accent-yellow: #ffc107;
+            --accent-hover: #e0a800;
+            --red-delete: #dc3545;
         }
 
         body {
-            background-color: #121212;
-            color: #e0e0e0;
-            padding: 20px;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
         }
 
-        .header {
+        /* --- SCHERMATA DI INGRESSO (LANDING) --- */
+        #landing-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-dark);
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            max-width: 1100px;
-            margin: 0 auto 20px auto;
-            flex-wrap: wrap;
-            gap: 15px;
+            z-index: 1000;
         }
 
-        .title-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .site-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            background: #252525;
-        }
-
-        .title-container h1 {
-            font-size: 28px;
-            color: #ffffff;
-            font-weight: 700;
-        }
-
-        .header-controls {
+        .landing-header {
             display: flex;
             align-items: center;
             gap: 15px;
-            flex-wrap: wrap;
+            margin-bottom: 40px;
         }
 
-        .add-server-box {
-            display: flex;
-            gap: 8px;
-        }
-
-        .add-server-box input {
-            background: #1e1e1e;
-            border: 1px solid #333;
-            color: #fff;
-            padding: 8px 12px;
+        /* Trasparenza assoluta garantita per l'icona 64x64 */
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: transparent !important;
             border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            width: 220px;
         }
 
-        .add-server-box input:focus {
-            border-color: #eab308;
+        .landing-title {
+            font-size: 2.5rem;
+            margin: 0;
         }
 
-        .add-server-box button {
-            background: #eab308;
-            color: #121212;
+        .landing-buttons {
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            background-color: var(--accent-yellow);
+            color: #000;
             border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: 10px 24px;
+            font-size: 1.1rem;
             font-weight: bold;
+            border-radius: 8px;
             cursor: pointer;
             transition: background 0.2s;
         }
 
-        .add-server-box button:hover {
-            background: #ca8a04;
+        .btn:hover { background-color: var(--accent-hover); }
+
+        #login-form {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 10px;
         }
 
-        .live-badge {
-            background: #1e1e1e;
+        input {
+            padding: 10px;
             border: 1px solid #333;
-            padding: 8px 14px;
+            background: #2a2a2a;
+            color: white;
+            border-radius: 6px;
+        }
+
+        /* --- APP PRINCIPALE --- */
+        #main-app { display: none; }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid #333;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+
+        .menu-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.8rem;
+            cursor: pointer;
+        }
+
+        .live-clock {
+            background: #2a2a2a;
+            padding: 8px 15px;
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 0.9rem;
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .live-dot {
-            width: 8px;
-            height: 8px;
-            background-color: #22c55e;
+            width: 10px; height: 10px;
+            background-color: #28a745;
             border-radius: 50%;
-            box-shadow: 0 0 8px #22c55e;
+            animation: pulse 1.5s infinite;
         }
 
-        .server-list {
-            max-width: 1100px;
-            margin: 0 auto;
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* MENU LATERALE */
+        #side-menu {
+            position: fixed;
+            top: 0; left: -250px;
+            width: 250px; height: 100%;
+            background-color: var(--bg-card);
+            border-right: 1px solid #333;
+            transition: 0.3s;
+            z-index: 500;
+            padding-top: 80px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
         }
+        #side-menu.open { left: 0; }
+        .menu-item {
+            background: none; border: none;
+            color: white; font-size: 1.1rem;
+            padding: 15px 20px; text-align: left;
+            cursor: pointer; transition: 0.2s;
+        }
+        .menu-item:hover { background: #333; }
 
-        .server-card {
-            background: #181818;
-            border: 1px solid #2a2a2a;
+        /* CARDS SERVER */
+        .container { padding: 30px; max-width: 1200px; margin: auto; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--bg-card);
             border-radius: 12px;
             padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 20px;
             position: relative;
         }
-
-        @media (max-width: 768px) {
-            .server-card {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .chart-box {
-                width: 100% !important;
-            }
+        .card-header { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; }
+        .card-icon { width: 48px; height: 48px; border-radius: 8px; background: transparent !important; }
+        .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; }
+        .card-status { font-size: 0.9rem; color: #28a745; }
+        .card-status.offline { color: var(--red-delete); }
+        .delete-btn {
+            position: absolute; top: 15px; right: 15px;
+            background: var(--red-delete); color: white;
+            border: none; padding: 5px 10px; border-radius: 5px;
+            cursor: pointer; display: none;
         }
-
-        .server-info {
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-            flex: 1;
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+            margin-bottom: 15px; font-size: 0.9rem; color: var(--text-muted);
         }
-
-        .rank-num {
-            font-weight: bold;
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-
-        .server-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 8px;
-            background: #252525;
-            object-fit: cover;
-        }
-
-        .server-details {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .server-header-line {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .server-name {
-            font-size: 18px;
-            font-weight: bold;
-            color: #fff;
-        }
-
-        .status-badge {
-            font-size: 10px;
-            font-weight: bold;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-        }
-
-        .status-badge.online {
-            background: rgba(34, 197, 94, 0.15);
-            color: #22c55e;
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .status-badge.offline {
-            background: rgba(239, 68, 68, 0.15);
-            color: #ef4444;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .stat-line {
-            font-size: 13px;
-            color: #aaa;
-        }
-
-        .stat-line span {
-            color: #fff;
-            font-weight: 600;
-        }
-
-        .chart-box {
-            width: 320px;
-            height: 120px;
-            position: relative;
-        }
+        .stats-grid strong { color: white; display: block; font-size: 1rem;}
+        canvas { max-width: 100%; height: 120px !important; }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <div class="title-container">
-            <img class="site-logo" src="/static/head.png" alt="Head" onerror="this.style.display='none'">
-            <h1>Venous Track</h1>
+    <!-- SCHERMATA INIZIALE -->
+    <div id="landing-screen">
+        <div class="landing-header">
+            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon"> <!-- Sostituisci con il link alla tua icona -->
+            <h1 class="landing-title">Venous Track</h1>
+        </div>
+        <div class="landing-buttons" id="landing-buttons">
+            <button class="btn" onclick="showLogin()">Login</button>
+            <button class="btn" onclick="enterApp('generali')">Default</button>
         </div>
         
-        <div class="header-controls">
-            <div class="add-server-box">
-                <input type="text" id="serverInput" placeholder="IP Server (es. mc.server.it)">
-                <button onclick="addServer()">Aggiungi</button>
-            </div>
-            <div class="live-badge">
-                <div class="live-dot"></div>
-                <span>Live: <strong id="clock">00:00:00</strong></span>
-            </div>
+        <div id="login-form">
+            <input type="text" id="username" placeholder="Nome Utente">
+            <input type="password" id="password" placeholder="Password">
+            <button class="btn" onclick="doLogin()">Entra</button>
+            <button class="btn" style="background: #555; color: white;" onclick="hideLogin()">Annulla</button>
+            <div id="login-error" style="color: #dc3545; display: none; font-size: 0.9rem;">Credenziali errate!</div>
         </div>
     </div>
 
-    <div class="server-list" id="serverContainer">
-        <!-- I server verranno caricati qui dinamicamente -->
+    <!-- APP PRINCIPALE -->
+    <div id="main-app">
+        <header>
+            <div class="header-left">
+                <button class="menu-btn" onclick="toggleMenu()">☰</button>
+                <div class="header-left" style="gap: 10px;">
+                    <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon">
+                    <h2 style="margin:0;" id="current-category-title">Tracker Generale</h2>
+                </div>
+            </div>
+            <div class="header-right">
+                <div id="add-server-ui" style="display: none; gap: 10px; align-items: center;">
+                    <input type="text" id="new-ip" placeholder="IP Server (es. mc.server.it)">
+                    <button class="btn" onclick="addServer()">Aggiungi</button>
+                </div>
+                <div class="live-clock">
+                    <div class="live-dot"></div>
+                    <span id="clock">--:--:--</span>
+                </div>
+            </div>
+        </header>
+
+        <div id="side-menu">
+            <button class="menu-item" onclick="enterApp('generali')">Tracker Generale</button>
+            <button class="menu-item" onclick="enterApp('italiani')">Tracker Italiano</button>
+            <button class="menu-item" id="menu-logout-btn" style="display: none; color: #dc3545;" onclick="doLogout()">Logout</button>
+            <button class="menu-item" id="menu-login-btn" onclick="location.reload()">Torna alla Home</button>
+        </div>
+
+        <div class="container">
+            <div class="grid" id="servers-grid">
+                <!-- Le cards si generano qui -->
+            </div>
+        </div>
     </div>
 
     <script>
-        const charts = {};
+        let currentCategory = 'generali';
+        let userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
+        let isLoggedIn = false;
+        let updateInterval;
+        let charts = {};
 
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString();
+        // --- GESTIONE OROLOGIO ---
+        setInterval(() => {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString('it-IT');
+        }, 1000);
+
+        // --- GESTIONE UI INIZIALE ---
+        function showLogin() {
+            document.getElementById('landing-buttons').style.display = 'none';
+            document.getElementById('login-form').style.display = 'flex';
+            document.getElementById('login-error').style.display = 'none';
         }
-        setInterval(updateClock, 1000);
-        updateClock();
+
+        function hideLogin() {
+            document.getElementById('landing-buttons').style.display = 'flex';
+            document.getElementById('login-form').style.display = 'none';
+        }
+
+        async function doLogin() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    userPermissions = data.permissions;
+                    isLoggedIn = true;
+                    enterApp('italiani'); // Se logga come admin lo porta agli italiani di default
+                } else {
+                    document.getElementById('login-error').style.display = 'block';
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function doLogout() {
+            await fetch('/api/logout', { method: 'POST' });
+            location.reload();
+        }
+
+        function toggleMenu() {
+            document.getElementById('side-menu').classList.toggle('open');
+        }
+
+        function enterApp(category) {
+            currentCategory = category;
+            document.getElementById('landing-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('side-menu').classList.remove('open');
+            
+            document.getElementById('current-category-title').innerText = category === 'italiani' ? 'Tracker Italiano' : 'Tracker Generale';
+            
+            // Gestione visibilità bottoni menu
+            if (isLoggedIn) {
+                document.getElementById('menu-logout-btn').style.display = 'block';
+                document.getElementById('menu-login-btn').style.display = 'none';
+            }
+
+            // Gestione visibilità Input Add Server
+            const canAdd = (category === 'italiani' && userPermissions.add_italiano) || 
+                           (category === 'generali' && userPermissions.add_generale);
+            document.getElementById('add-server-ui').style.display = canAdd ? 'flex' : 'none';
+
+            loadData();
+            if(updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(loadData, 5000); // 5 secondi
+        }
+
+        // --- GESTIONE DATI API ---
+        async function loadData() {
+            try {
+                const res = await fetch(`/api/stats/${currentCategory}`);
+                const data = await res.json();
+                renderCards(data);
+            } catch (e) { console.error("Errore fetch dati:", e); }
+        }
 
         async function addServer() {
-            const input = document.getElementById('serverInput');
-            const ip = input.value.trim();
-            if (!ip) return;
-
+            const ip = document.getElementById('new-ip').value;
+            if(!ip) return;
             try {
-                const res = await fetch('/api/servers', {
+                await fetch(`/api/servers/${currentCategory}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ip: ip })
                 });
-                const data = await res.json();
-                if (res.ok) {
-                    input.value = '';
-                    fetchStats();
-                } else {
-                    alert(data.message || 'Errore durante l\'aggiunta.');
-                }
-            } catch (err) {
-                console.error("Errore aggiunta server:", err);
-            }
+                document.getElementById('new-ip').value = '';
+                loadData();
+            } catch (e) { alert("Errore aggiunta server"); }
         }
 
-        async function fetchStats() {
+        async function deleteServer(ip) {
+            if(!confirm(`Sicuro di voler eliminare ${ip}?`)) return;
             try {
-                const res = await fetch('/api/stats');
-                const data = await res.json();
-                renderServers(data);
-            } catch (err) {
-                console.error("Errore fetch stats:", err);
-            }
+                await fetch(`/api/servers/${currentCategory}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip })
+                });
+                loadData();
+            } catch (e) { alert("Errore eliminazione server"); }
         }
 
-        function renderServers(servers) {
-            const container = document.getElementById('serverContainer');
+        // --- RENDERING CARDS E GRAFICI ---
+        function renderCards(servers) {
+            const grid = document.getElementById('servers-grid');
+            
+            // Se ci sono server che non sono più in lista, eliminiamo le loro card/chart
+            const activeIps = servers.map(s => s.ip);
+            Array.from(grid.children).forEach(child => {
+                if(!activeIps.includes(child.dataset.ip)) {
+                    if(charts[child.dataset.ip]) charts[child.dataset.ip].destroy();
+                    child.remove();
+                }
+            });
 
-            servers.forEach((server, index) => {
-                const safeIpId = server.ip.replace(/[^a-zA-Z0-9]/g, '_');
-                let card = document.getElementById(`card-${safeIpId}`);
-
-                const faviconSrc = server.favicon || '/static/head.png';
-                const statusClass = server.online ? 'online' : 'offline';
-                const statusText = server.online ? 'ONLINE' : 'OFFLINE';
-
+            servers.forEach(srv => {
+                let card = document.querySelector(`.card[data-ip="${srv.ip}"]`);
                 if (!card) {
                     card = document.createElement('div');
-                    card.id = `card-${safeIpId}`;
-                    card.className = 'server-card';
+                    card.className = 'card';
+                    card.dataset.ip = srv.ip;
+                    
+                    const delBtn = userPermissions.delete_server 
+                        ? `<button class="delete-btn" style="display:block;" onclick="deleteServer('${srv.ip}')">X</button>` 
+                        : '';
+
                     card.innerHTML = `
-                        <div class="server-info">
-                            <div class="rank-num" id="rank-${safeIpId}">#${index + 1}</div>
-                            <img class="server-icon" id="icon-${safeIpId}" src="${faviconSrc}" alt="Icon" onerror="this.src='/static/head.png'">
-                            <div class="server-details">
-                                <div class="server-header-line">
-                                    <span class="server-name">${server.ip}</span>
-                                    <span class="status-badge ${statusClass}" id="status-${safeIpId}">${statusText}</span>
-                                </div>
-                                <div class="stat-line">Players: <span id="players-${safeIpId}">${server.players.toLocaleString('it-IT')}</span></div>
-                                <div class="stat-line">72h Peak: <span id="peak-${safeIpId}">${server.peak_72h}</span></div>
-                                <div class="stat-line">Record: <span id="record-${safeIpId}">${server.record}</span></div>
-                                <div class="stat-line">1 Day Ago: <span id="d1-${safeIpId}">${server.day_1}</span></div>
-                                <div class="stat-line">2 Days Ago: <span id="d2-${safeIpId}">${server.day_2}</span></div>
-                                <div class="stat-line">3 Days Ago: <span id="d3-${safeIpId}">${server.day_3}</span></div>
-                                <div class="stat-line" id="ver-${safeIpId}" style="font-size:11px; margin-top:4px; color:#777;">${server.version}</div>
+                        ${delBtn}
+                        <div class="card-header">
+                            <img class="card-icon" id="icon-${srv.ip}" src="">
+                            <div>
+                                <h3 class="card-title">${srv.ip}</h3>
+                                <div class="card-status" id="status-${srv.ip}">Aggiornamento...</div>
                             </div>
                         </div>
-                        <div class="chart-box">
-                            <canvas id="chart-${safeIpId}"></canvas>
+                        <div class="stats-grid">
+                            <div>Live Players <strong id="players-${srv.ip}">-</strong></div>
+                            <div>Record (Sempre) <strong id="record-${srv.ip}">-</strong></div>
+                            <div>Picco 72h <strong id="peak-${srv.ip}">-</strong></div>
+                            <div>-1 Giorno <strong id="day1-${srv.ip}">-</strong></div>
                         </div>
+                        <canvas id="chart-${srv.ip}"></canvas>
                     `;
-                    container.appendChild(card);
-                } else {
-                    document.getElementById(`rank-${safeIpId}`).innerText = `#${index + 1}`;
-                    document.getElementById(`players-${safeIpId}`).innerText = server.players.toLocaleString('it-IT');
-                    document.getElementById(`peak-${safeIpId}`).innerText = server.peak_72h;
-                    document.getElementById(`record-${safeIpId}`).innerText = server.record;
-                    document.getElementById(`d1-${safeIpId}`).innerText = server.day_1;
-                    document.getElementById(`d2-${safeIpId}`).innerText = server.day_2;
-                    document.getElementById(`d3-${safeIpId}`).innerText = server.day_3;
-                    document.getElementById(`ver-${safeIpId}`).innerText = server.version;
-
-                    const statusBadge = document.getElementById(`status-${safeIpId}`);
-                    statusBadge.className = `status-badge ${statusClass}`;
-                    statusBadge.innerText = statusText;
-
-                    const icon = document.getElementById(`icon-${safeIpId}`);
-                    if (server.favicon && icon.src !== server.favicon) {
-                        icon.src = server.favicon;
-                    }
-
-                    container.appendChild(card);
+                    grid.appendChild(card);
                 }
 
-                if (charts[safeIpId]) {
-                    charts[safeIpId].data.labels = server.chart_labels;
-                    charts[safeIpId].data.datasets[0].data = server.chart_data;
-                    charts[safeIpId].update('none');
+                // Aggiornamento dati DOM
+                const iconSrc = srv.favicon || "https://i.imgur.com/2ZQbK1k.png"; // Placeholder trasparente se manca
+                document.getElementById(`icon-${srv.ip}`).src = iconSrc;
+                
+                const statusEl = document.getElementById(`status-${srv.ip}`);
+                if (srv.online) {
+                    statusEl.innerText = "Online";
+                    statusEl.className = "card-status";
                 } else {
-                    const ctx = document.getElementById(`chart-${safeIpId}`).getContext('2d');
-                    charts[safeIpId] = new Chart(ctx, {
+                    statusEl.innerText = "Offline";
+                    statusEl.className = "card-status offline";
+                }
+
+                document.getElementById(`players-${srv.ip}`).innerText = `${srv.players} / ${srv.max}`;
+                document.getElementById(`record-${srv.ip}`).innerText = srv.record || "-";
+                document.getElementById(`peak-${srv.ip}`).innerText = srv.peak_72h || "-";
+                document.getElementById(`day1-${srv.ip}`).innerText = srv.day_1 || "-";
+
+                // Gestione Grafico Chart.js - RIMASTO INATTO
+                const ctx = document.getElementById(`chart-${srv.ip}`).getContext('2d');
+                if (!charts[srv.ip]) {
+                    charts[srv.ip] = new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: server.chart_labels,
+                            labels: srv.chart_labels,
                             datasets: [{
-                                data: server.chart_data,
-                                borderColor: '#eab308',
-                                backgroundColor: 'rgba(234, 179, 8, 0.08)',
+                                label: 'Giocatori',
+                                data: srv.chart_data,
+                                borderColor: '#ffc107',
+                                backgroundColor: 'rgba(255, 193, 7, 0.1)',
                                 borderWidth: 2,
                                 fill: true,
-                                tension: 0.35,
-                                pointRadius: 0,
-                                pointHoverRadius: 6,
-                                pointHitRadius: 20,
-                                pointBackgroundColor: '#eab308'
+                                tension: 0.3,
+                                pointRadius: 0
                             }]
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    enabled: true,
-                                    mode: 'index',
-                                    intersect: false,
-                                    displayColors: false,
-                                    callbacks: {
-                                        title: function(context) {
-                                            return 'Ora: ' + context[0].label;
-                                        },
-                                        label: function(context) {
-                                            return 'Giocatori: ' + context.raw.toLocaleString('it-IT');
-                                        }
-                                    }
-                                }
-                            },
+                            animation: false,
+                            plugins: { legend: { display: false } },
                             scales: {
                                 x: { display: false },
-                                y: {
-                                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                                    ticks: { color: '#666', font: { size: 10 } }
+                                y: { 
+                                    display: true, 
+                                    grid: { color: '#333' },
+                                    ticks: { color: '#a0a0a0' }
                                 }
                             }
                         }
                     });
+                } else {
+                    charts[srv.ip].data.labels = srv.chart_labels;
+                    charts[srv.ip].data.datasets[0].data = srv.chart_data;
+                    charts[srv.ip].update();
                 }
             });
         }
 
-        fetchStats();
-        setInterval(fetchStats, 5000);
+        // All'avvio, controlliamo la sessione in automatico dal server in background
+        fetch('/api/auth')
+            .then(res => res.json())
+            .then(data => {
+                if(data.logged_in) {
+                    isLoggedIn = true;
+                    userPermissions = data.permissions;
+                }
+            }).catch(e => console.log("Guest mode"));
+            
     </script>
 </body>
 </html>

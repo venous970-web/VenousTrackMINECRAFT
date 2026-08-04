@@ -18,7 +18,7 @@ CORS(app, supports_credentials=True)
 # Chiave segreta per le sessioni di login
 app.secret_key = os.environ.get("SECRET_KEY", "chiave-super-segreta-venous970")
 
-# Database separati: il generale usa il tuo vecchio db storico, l'italiano riparte da zero
+# Database separati: il generale usa il vecchio db storico, l'italiano riparte da zero
 DB_ITA = "venous_track_ita.db"
 DB_GEN = "venous_track.db" 
 CONFIG_FILE = "servers.json"
@@ -250,6 +250,7 @@ def background_tracker():
                         state.update({"online": False, "players": 0, "version": "Non raggiungibile"})
                     print(f"  🔴 {ip} ({cat}) -> OFFLINE ({state['fail_count']}/{MAX_FAILS}) | Err: {err}")
 
+            # FONDAMENTALE: Esegue il commit e chiude le connessioni per salvare effettivamente su disco .db
             conn_ita.commit()
             conn_ita.close()
             conn_gen.commit()
@@ -405,7 +406,7 @@ def handle_servers(category):
 @app.route("/api/stats/<category>", methods=["GET"])
 def get_stats(category):
     if category not in ["italiani", "generali"]:
-        return jsonify({"status": "error", "message": "Categoria non valida"}), 0
+        return jsonify({"status": "error", "message": "Categoria non valida"}), 400
 
     full_results = []
     for ip in servers_data.get(category, []):

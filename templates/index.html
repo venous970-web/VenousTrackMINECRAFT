@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Venous Track</title>
-    <!-- Favicon locale dal server Flask -->
+    <!-- Favicon locale -->
     <link rel="icon" type="image/png" href="/static/head.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -152,17 +152,27 @@
             border-right: 1px solid #333;
             transition: 0.3s;
             z-index: 500;
-            padding-top: 80px;
+            padding-top: 20px;
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
         #side-menu.open { left: 0; }
+        
+        .menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #333;
+        }
+
         .menu-item {
             background: none; border: none;
             color: white; font-size: 1.1rem;
             padding: 15px 20px; text-align: left;
             cursor: pointer; transition: 0.2s;
+            width: 100%;
         }
         .menu-item:hover { background: #333; }
 
@@ -226,7 +236,7 @@
 </head>
 <body>
 
-    <!-- Schermata iniziale originale -->
+    <!-- Schermata iniziale -->
     <div id="landing-screen">
         <div class="landing-header">
             <img src="/static/head.png" alt="Logo" class="logo-icon">
@@ -259,15 +269,21 @@
                     <div class="live-dot"></div>
                     <span id="clock">--:--:--</span>
                 </div>
-                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem;">Logout</button>
+                <!-- Tasto Aggiungi Server spostato nell'header (visibile solo se abilitato) -->
+                <button class="btn" id="add-server-header-btn" onclick="promptAddServer()" style="display:none; padding: 6px 12px; font-size: 0.9rem;">➕ Aggiungi Server</button>
+                <!-- Tasto Logout -->
+                <button class="btn" id="logout-btn" onclick="performLogout()" style="display:none; padding: 6px 12px; font-size: 0.9rem; background: #333; color: white; border: 1px solid #555;">Logout</button>
             </div>
         </header>
 
-        <!-- Menu laterale con Aggiungi Server nel posto originale -->
+        <!-- Menu laterale corretto con tasto di chiusura -->
         <div id="side-menu">
+            <div class="menu-header">
+                <h3 style="margin:0;">Menu</h3>
+                <button class="menu-btn" onclick="toggleMenu()" style="font-size: 1.4rem;">✕</button>
+            </div>
             <button class="menu-item" onclick="switchCategory('italiani')">🇮🇹 Server Italiani</button>
             <button class="menu-item" onclick="switchCategory('generali')">🌐 Server Generali</button>
-            <button class="menu-item" id="add-server-menu-btn" onclick="promptAddServer()" style="display:none;">➕ Aggiungi Server</button>
             <button class="menu-item" onclick="goHome()">🏠 Home</button>
         </div>
 
@@ -314,6 +330,7 @@
             currentCategory = category;
             document.getElementById('category-title').innerText = category === 'italiani' ? 'Server Italiani' : 'Server Generali';
             toggleMenu();
+            checkAuthStatus();
             loadServersStats();
         }
 
@@ -336,11 +353,12 @@
                     document.getElementById('logout-btn').style.display = 'none';
                 }
 
+                // Logica permessi: Aggiungi server abilitato solo se i permessi lo consentono E ci si trova nella categoria corretta (es. Generali per default)
                 const canAdd = (currentCategory === 'italiani' && userPermissions.add_italiano) || (currentCategory === 'generali' && userPermissions.add_generale);
-                if (canAdd || userPermissions.delete_server) {
-                    document.getElementById('add-server-menu-btn').style.display = 'block';
+                if (canAdd) {
+                    document.getElementById('add-server-header-btn').style.display = 'block';
                 } else {
-                    document.getElementById('add-server-menu-btn').style.display = 'none';
+                    document.getElementById('add-server-header-btn').style.display = 'none';
                 }
             } catch (e) {
                 console.error("Errore verifica auth", e);
@@ -394,10 +412,9 @@
                     
                     const faviconSrc = srv.favicon || '/static/head.png';
                     const statusClass = srv.online ? 'card-status' : 'card-status offline';
-                    
-                    // Mostra solo lo stato online/offline senza indicare i player max sotto al nome
                     const statusText = srv.online ? '🟢 Online' : '🔴 Offline';
                     
+                    // Mostra il tasto elimina solo se l'utente ha i permessi specifici di eliminazione
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 
                     card.innerHTML = `
@@ -450,13 +467,26 @@
                         borderWidth: 2,
                         fill: true,
                         tension: 0.3,
-                        pointRadius: 0
+                        pointRadius: 0,
+                        pointHoverRadius: 5
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Player: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
                         x: { display: false },
                         y: { 

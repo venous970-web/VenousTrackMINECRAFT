@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Venous Track</title>
-    <!-- Favicon del browser -->
-    <link rel="icon" type="image/png" href="https://i.imgur.com/2ZQbK1k.png">
+    <!-- Favicon locale dal server Flask -->
+    <link rel="icon" type="image/png" href="/static/head.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -226,14 +226,14 @@
 </head>
 <body>
 
-    <!-- Schermata iniziale -->
+    <!-- Schermata iniziale originale -->
     <div id="landing-screen">
         <div class="landing-header">
-            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Logo" class="logo-icon">
+            <img src="/static/head.png" alt="Logo" class="logo-icon">
             <h1 class="landing-title">Venous Track</h1>
         </div>
         <div class="landing-buttons" id="landing-buttons">
-            <button class="btn" onclick="enterApp('italiani') servers">Server Italiani</button>
+            <button class="btn" onclick="enterApp('italiani')">Server Italiani</button>
             <button class="btn" onclick="enterApp('generali')">Server Generali</button>
             <button class="btn" onclick="toggleLoginBox()" style="background: transparent; border: 2px solid var(--accent-yellow); color: var(--accent-yellow);">Login</button>
         </div>
@@ -250,7 +250,7 @@
             <div class="header-left">
                 <button class="menu-btn" onclick="toggleMenu()">☰</button>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <img src="https://i.imgur.com/2ZQbK1k.png" alt="Logo" class="logo-icon" style="width: 36px; height: 36px;">
+                    <img src="/static/head.png" alt="Logo" class="logo-icon" style="width: 36px; height: 36px;">
                     <h2 id="category-title" style="margin:0;">Server Italiani</h2>
                 </div>
             </div>
@@ -263,7 +263,7 @@
             </div>
         </header>
 
-        <!-- Menu laterale -->
+        <!-- Menu laterale con Aggiungi Server nel posto originale -->
         <div id="side-menu">
             <button class="menu-item" onclick="switchCategory('italiani')">🇮🇹 Server Italiani</button>
             <button class="menu-item" onclick="switchCategory('generali')">🌐 Server Generali</button>
@@ -386,16 +386,17 @@
                 const servers = await res.json();
                 const grid = document.getElementById('servers-grid');
                 
-                // Mantieni traccia degli IP esistenti per aggiornare senza ricreare tutto se possibile
                 grid.innerHTML = '';
 
                 servers.forEach((srv, index) => {
                     const card = document.createElement('div');
                     card.className = 'card';
                     
-                    const faviconSrc = srv.favicon || 'https://i.imgur.com/2ZQbK1k.png';
+                    const faviconSrc = srv.favicon || '/static/head.png';
                     const statusClass = srv.online ? 'card-status' : 'card-status offline';
-                    const statusText = srv.online ? `🟢 Online (${srv.players}/${srv.max})` : '🔴 Offline';
+                    
+                    // Mostra solo lo stato online/offline senza indicare i player max sotto al nome
+                    const statusText = srv.online ? '🟢 Online' : '🔴 Offline';
                     
                     const showDelete = userPermissions.delete_server ? 'display: block;' : 'display: none;';
 

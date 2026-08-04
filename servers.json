@@ -1,14 +1,19 @@
-[
-    "mc.coralmc.it",
-    "play.metamc.it",
-    "play.tecnocraft.net",
-    "play.scarletmc.it",
-    "mc.whengamersfail.it",
-    "hypixel.net",
-    "donutsmp.net",
-    "eu.mineman.club",
-    "play.edenmine.eu",
-    "welcome-prince.gl.joinmc.link",
-    "fyresmp.net",
-    "play.skypea.it"
-]
+{
+    "italiani": [
+        "venous.coralmc.it"
+    ],
+    "generali": [
+        "mc.coralmc.it",
+        "play.metamc.it",
+        "play.tecnocraft.net",
+        "play.scarletmc.it",
+        "mc.whengamersfail.it",
+        "hypixel.net",
+        "donutsmp.net",
+        "eu.mineman.club",
+        "play.edenmine.eu",
+        "welcome-prince.gl.joinmc.link",
+        "fyresmp.net",
+        "play.skypea.it"
+    ]
+}

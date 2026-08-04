@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Venous Track</title>
+    <!-- Favicon del browser con la tua icona -->
+    <link rel="icon" type="image/png" href="https://i.imgur.com/2ZQbK1k.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -25,7 +27,6 @@
             overflow-x: hidden;
         }
 
-        /* --- SCHERMATA DI INGRESSO (LANDING) --- */
         #landing-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -96,7 +97,6 @@
             border-radius: 6px;
         }
 
-        /* --- APP PRINCIPALE --- */
         #main-app { display: none; }
 
         header {
@@ -142,7 +142,6 @@
             100% { opacity: 1; }
         }
 
-        /* MENU LATERALE */
         #side-menu {
             position: fixed;
             top: 0; left: -250px;
@@ -165,7 +164,6 @@
         }
         .menu-item:hover { background: #333; }
 
-        /* CARDS SERVER */
         .container { padding: 30px; max-width: 1200px; margin: auto; }
         .grid {
             display: grid;
@@ -182,7 +180,6 @@
         .card-icon { width: 48px; height: 48px; }
         .card-title { font-size: 1.2rem; font-weight: bold; margin: 0; display: flex; align-items: center; }
         
-        /* Stile del Rank #1, #2... */
         .rank-badge { color: var(--text-muted); font-size: 1.2rem; margin-right: 8px; font-weight: bold; }
         
         .card-status { font-size: 0.95rem; color: #28a745; font-weight: 500; }
@@ -213,323 +210,16 @@
             font-weight: bold;
         }
         
-        /* Aumentata l'altezza del grafico per non schiacciare i numeri */
-        canvas { max-width: 100%; height: 160px !important; }
+        /* Contenitore rigido per adattare perfettamente il grafico alle dimensioni della card senza distorsioni */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 130px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 130px !important;
+        }
     </style>
 </head>
-<body>
-
-    <!-- SCHERMATA INIZIALE -->
-    <div id="landing-screen">
-        <div class="landing-header">
-            <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon">
-            <h1 class="landing-title">Venous Track</h1>
-        </div>
-        <div class="landing-buttons" id="landing-buttons">
-            <button class="btn" onclick="showLogin()">Login</button>
-            <button class="btn" onclick="enterApp('generali')">Default</button>
-        </div>
-        
-        <div id="login-form">
-            <input type="text" id="username" placeholder="Nome Utente">
-            <input type="password" id="password" placeholder="Password">
-            <button class="btn" onclick="doLogin()">Entra</button>
-            <button class="btn" style="background: #555; color: white;" onclick="hideLogin()">Annulla</button>
-            <div id="login-error" style="color: #dc3545; display: none; font-size: 0.9rem;">Credenziali errate!</div>
-        </div>
-    </div>
-
-    <!-- APP PRINCIPALE -->
-    <div id="main-app">
-        <header>
-            <div class="header-left">
-                <button class="menu-btn" onclick="toggleMenu()">☰</button>
-                <div class="header-left" style="gap: 10px;">
-                    <img src="https://i.imgur.com/2ZQbK1k.png" alt="Icon" class="logo-icon">
-                    <h2 style="margin:0;" id="current-category-title">Tracker Generale</h2>
-                </div>
-            </div>
-            <div class="header-right">
-                <div id="add-server-ui" style="display: none; gap: 10px; align-items: center;">
-                    <input type="text" id="new-ip" placeholder="IP Server (es. mc.server.it)">
-                    <button class="btn" onclick="addServer()">Aggiungi</button>
-                </div>
-                <div class="live-clock">
-                    <div class="live-dot"></div>
-                    <span id="clock">--:--:--</span>
-                </div>
-            </div>
-        </header>
-
-        <div id="side-menu">
-            <button class="menu-item" onclick="enterApp('generali')">Tracker Generale</button>
-            <button class="menu-item" onclick="enterApp('italiani')">Tracker Italiano</button>
-            <button class="menu-item" id="menu-logout-btn" style="display: none; color: #dc3545;" onclick="doLogout()">Logout</button>
-            <button class="menu-item" id="menu-login-btn" onclick="location.reload()">Torna alla Home</button>
-        </div>
-
-        <div class="container">
-            <div class="grid" id="servers-grid">
-                <!-- Le cards si generano qui -->
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let currentCategory = 'generali';
-        let userPermissions = { add_italiano: false, add_generale: true, delete_server: false };
-        let isLoggedIn = false;
-        let updateInterval;
-        let charts = {};
-
-        setInterval(() => {
-            document.getElementById('clock').innerText = new Date().toLocaleTimeString('it-IT');
-        }, 1000);
-
-        function showLogin() {
-            document.getElementById('landing-buttons').style.display = 'none';
-            document.getElementById('login-form').style.display = 'flex';
-            document.getElementById('login-error').style.display = 'none';
-        }
-
-        function hideLogin() {
-            document.getElementById('landing-buttons').style.display = 'flex';
-            document.getElementById('login-form').style.display = 'none';
-        }
-
-        async function doLogin() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    userPermissions = data.permissions;
-                    isLoggedIn = true;
-                    enterApp('italiani');
-                } else {
-                    document.getElementById('login-error').style.display = 'block';
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        async function doLogout() {
-            await fetch('/api/logout', { method: 'POST' });
-            location.reload();
-        }
-
-        function toggleMenu() {
-            document.getElementById('side-menu').classList.toggle('open');
-        }
-
-        function enterApp(category) {
-            currentCategory = category;
-            document.getElementById('landing-screen').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('side-menu').classList.remove('open');
-            
-            document.getElementById('current-category-title').innerText = category === 'italiani' ? 'Tracker Italiano' : 'Tracker Generale';
-            
-            if (isLoggedIn) {
-                document.getElementById('menu-logout-btn').style.display = 'block';
-                document.getElementById('menu-login-btn').style.display = 'none';
-            }
-
-            const canAdd = (category === 'italiani' && userPermissions.add_italiano) || 
-                           (category === 'generali' && userPermissions.add_generale);
-            document.getElementById('add-server-ui').style.display = canAdd ? 'flex' : 'none';
-
-            loadData();
-            if(updateInterval) clearInterval(updateInterval);
-            updateInterval = setInterval(loadData, 5000);
-        }
-
-        async function loadData() {
-            try {
-                const res = await fetch(`/api/stats/${currentCategory}`);
-                const data = await res.json();
-                renderCards(data);
-            } catch (e) { console.error("Errore fetch dati:", e); }
-        }
-
-        async function addServer() {
-            const ip = document.getElementById('new-ip').value;
-            if(!ip) return;
-            try {
-                await fetch(`/api/servers/${currentCategory}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip: ip })
-                });
-                document.getElementById('new-ip').value = '';
-                loadData();
-            } catch (e) { alert("Errore aggiunta server"); }
-        }
-
-        async function deleteServer(ip) {
-            if(!confirm(`Sicuro di voler eliminare ${ip}?`)) return;
-            try {
-                await fetch(`/api/servers/${currentCategory}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ip: ip })
-                });
-                loadData();
-            } catch (e) { alert("Errore eliminazione server"); }
-        }
-
-        function renderCards(servers) {
-            const grid = document.getElementById('servers-grid');
-            
-            // Pulizia delle card non più presenti nella categoria attuale
-            const activeIps = servers.map(s => s.ip);
-            Array.from(grid.children).forEach(child => {
-                if(!activeIps.includes(child.dataset.ip)) {
-                    if(charts[child.dataset.ip]) {
-                        charts[child.dataset.ip].destroy();
-                        delete charts[child.dataset.ip];
-                    }
-                    child.remove();
-                }
-            });
-
-            // Iteriamo rispettando l'ordine dell'array (che è già ordinato per rank nel backend)
-            servers.forEach((srv, index) => {
-                let card = document.querySelector(`.card[data-ip="${srv.ip}"]`);
-                
-                if (!card) {
-                    card = document.createElement('div');
-                    card.className = 'card';
-                    card.dataset.ip = srv.ip;
-                    
-                    const delBtn = userPermissions.delete_server 
-                        ? `<button class="delete-btn" style="display:block;" onclick="deleteServer('${srv.ip}')">X</button>` 
-                        : '';
-
-                    card.innerHTML = `
-                        ${delBtn}
-                        <div class="card-header">
-                            <img class="card-icon" id="icon-${srv.ip}" src="">
-                            <div>
-                                <h3 class="card-title">
-                                    <span id="rank-${srv.ip}" class="rank-badge">#${index + 1}</span>
-                                    ${srv.ip}
-                                </h3>
-                                <div class="card-status" id="status-${srv.ip}">Aggiornamento...</div>
-                                <div class="card-version" id="version-${srv.ip}">-</div>
-                            </div>
-                        </div>
-                        <div class="stats-grid">
-                            <div>Live Players <strong id="players-${srv.ip}">-</strong></div>
-                            <div>Record <strong id="record-${srv.ip}">-</strong></div>
-                            <div>Picco 72h <strong id="peak-${srv.ip}">-</strong></div>
-                            <div>1 day ago <strong id="day1-${srv.ip}">-</strong></div>
-                            <div>2 days ago <strong id="day2-${srv.ip}">-</strong></div>
-                            <div>3 days ago <strong id="day3-${srv.ip}">-</strong></div>
-                        </div>
-                        <canvas id="chart-${srv.ip}"></canvas>
-                    `;
-                }
-                
-                // Assicuriamoci che la card venga spostata alla giusta posizione nel DOM! 
-                // Questo risolve il bug di visibilità durante i cambi di categoria
-                grid.appendChild(card);
-
-                // Aggiornamento dati dinamici
-                const iconSrc = srv.favicon || "https://i.imgur.com/2ZQbK1k.png"; 
-                document.getElementById(`icon-${srv.ip}`).src = iconSrc;
-                document.getElementById(`rank-${srv.ip}`).innerText = `#${index + 1}`;
-                
-                const statusEl = document.getElementById(`status-${srv.ip}`);
-                if (srv.online) {
-                    statusEl.innerText = "Online";
-                    statusEl.className = "card-status";
-                } else {
-                    statusEl.innerText = "Offline";
-                    statusEl.className = "card-status offline";
-                }
-
-                document.getElementById(`version-${srv.ip}`).innerText = srv.version || "Sconosciuta";
-                document.getElementById(`players-${srv.ip}`).innerText = srv.players;
-                document.getElementById(`record-${srv.ip}`).innerText = srv.record || "-";
-                document.getElementById(`peak-${srv.ip}`).innerText = srv.peak_72h || "-";
-                document.getElementById(`day1-${srv.ip}`).innerText = srv.day_1 || "-";
-                document.getElementById(`day2-${srv.ip}`).innerText = srv.day_2 || "-";
-                document.getElementById(`day3-${srv.ip}`).innerText = srv.day_3 || "-";
-
-                // Gestione Grafico con tooltips abilitati
-                const ctx = document.getElementById(`chart-${srv.ip}`).getContext('2d');
-                if (!charts[srv.ip]) {
-                    charts[srv.ip] = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: srv.chart_labels,
-                            datasets: [{
-                                label: 'Giocatori',
-                                data: srv.chart_data,
-                                borderColor: '#ffc107',
-                                backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                                borderWidth: 2,
-                                fill: true,
-                                tension: 0.3
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            animation: false,
-                            interaction: {
-                                mode: 'index',
-                                intersect: false
-                            },
-                            plugins: { 
-                                legend: { display: false },
-                                tooltip: { enabled: true } // Abilitato l'hover con l'orario e numero
-                            },
-                            elements: {
-                                point: {
-                                    radius: 0,
-                                    hitRadius: 15, // Aumenta l'area tattile per mouse/touch
-                                    hoverRadius: 5
-                                }
-                            },
-                            scales: {
-                                x: { display: false },
-                                y: { 
-                                    display: true, 
-                                    grid: { color: '#333' },
-                                    ticks: { 
-                                        color: '#a0a0a0',
-                                        maxTicksLimit: 5 // Limita le righe per non ammassare i numeri
-                                    }
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    charts[srv.ip].data.labels = srv.chart_labels;
-                    charts[srv.ip].data.datasets[0].data = srv.chart_data;
-                    charts[srv.ip].update();
-                }
-            });
-        }
-
-        fetch('/api/auth')
-            .then(res => res.json())
-            .then(data => {
-                if(data.logged_in) {
-                    isLoggedIn = true;
-                    userPermissions = data.permissions;
-                }
-            }).catch(e => console.log("Guest mode"));
-            
-    </script>
-</body>
-</html>

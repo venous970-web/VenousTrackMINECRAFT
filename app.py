@@ -37,11 +37,13 @@ ITALY_TZ = ZoneInfo("Europe/Rome")
 # --- SINCRONIZZAZIONE GITHUB (DB E JSON) ---
 def download_file_from_github(filepath, filename):
     if not GITHUB_TOKEN or not GITHUB_REPO:
+        print(f"⚠️ Salto download di {filename}: Token o Repo non configurati.")
         return
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
     try:
         res = requests.get(url, headers=headers)
@@ -51,8 +53,12 @@ def download_file_from_github(filepath, filename):
                 with open(filepath, "wb") as f:
                     f.write(base64.b64decode(content_b64))
                 print(f"📥 {filename} scaricato da GitHub con successo.")
+        elif res.status_code == 404:
+            print(f"ℹ️ {filename} non esiste ancora su GitHub. Verrà creato al primo backup.")
+        else:
+            print(f"⚠️ Errore download {filename}: {res.status_code} - {res.text}")
     except Exception as e:
-        print(f"⚠️ Impossibile scaricare {filename} da GitHub: {e}")
+        print(f"⚠️ Eccezione durante il download di {filename}: {e}")
 
 def sync_file_to_github(filepath, filename):
     if not GITHUB_TOKEN or not GITHUB_REPO:
@@ -61,6 +67,7 @@ def sync_file_to_github(filepath, filename):
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
     
     sha = None
@@ -77,7 +84,7 @@ def sync_file_to_github(filepath, filename):
                 content_b64 = base64.b64encode(f.read()).decode("utf-8")
                 
             payload = {
-                "message": f"Auto-backup {filename} da app",
+                "message": f"Auto-backup {filename} da app VenousTrack",
                 "content": content_b64,
             }
             if sha:
@@ -86,8 +93,10 @@ def sync_file_to_github(filepath, filename):
             res = requests.put(url, headers=headers, json=payload)
             if res.status_code in [200, 201]:
                 print(f"✅ Backup di {filename} su GitHub completato.")
+            else:
+                print(f"❌ Errore GitHub upload {filename}: {res.status_code} - {res.text}")
     except Exception as e:
-        print(f"❌ Errore upload {filename}: {e}")
+        print(f"❌ Eccezione durante l'upload di {filename}: {e}")
 
 def hourly_github_backup():
     while True:
@@ -102,8 +111,9 @@ def hourly_github_backup():
 print("🔄 Esecuzione download iniziale dei database da GitHub...")
 download_file_from_github(DB_ITA, "venous_track_ita.db")
 download_file_from_github(DB_GEN, "venous_track.db")
+download_file_from_github(CONFIG_FILE, "servers.json")
 
-# Avvia il thread di backup orario in background (non blocca l'interfaccia)
+# Avvia il thread di backup orario in background
 backup_thread = threading.Thread(target=hourly_github_backup, daemon=True)
 backup_thread.start()
 
@@ -361,7 +371,7 @@ def handle_servers(category):
                 servers_data[other_cat].remove(ip)
                 
             servers_data[category].append(ip)
-            sync_file_to_github(CONFIG_FILE, "servers.json") # Sync immediato configurazione
+            sync_file_to_github(CONFIG_FILE, "servers.json") 
             
             status, _ = query_minecraft_server(ip)
             if status is not None:

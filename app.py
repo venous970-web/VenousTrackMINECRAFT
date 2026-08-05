@@ -18,11 +18,13 @@ CORS(app, supports_credentials=True)
 # Chiave segreta per le sessioni di login
 app.secret_key = os.environ.get("SECRET_KEY", "chiave-super-segreta-venous970")
 
-# Database separati: il generale usa il vecchio db storico, l'italiano riparte da zero
-DB_ITA = "venous_track_ita.db"
-DB_GEN = "venous_track.db" 
-CONFIG_FILE = "servers.json"
-USERS_FILE = "users.json"
+# --- PERCORSI ASSOLUTI (Risolve il problema del salvataggio file/db) ---
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+DB_ITA = os.path.join(BASE_DIR, "venous_track_ita.db")
+DB_GEN = os.path.join(BASE_DIR, "venous_track.db") 
+CONFIG_FILE = os.path.join(BASE_DIR, "servers.json")
+USERS_FILE = os.path.join(BASE_DIR, "users.json")
 
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = os.environ.get("GITHUB_REPO")
@@ -49,14 +51,14 @@ def init_users_file():
                 "delete_server": False
             }
         }
-        with open(USERS_FILE, "w") as f:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(default_users, f, indent=4)
 
 init_users_file()
 
 def get_permissions(username):
     try:
-        with open(USERS_FILE, "r") as f:
+        with open(USERS_FILE, "r", encoding="utf-8") as f:
             users = json.load(f)
             return users.get(username, users.get("guest"))
     except Exception:
@@ -125,7 +127,7 @@ def save_servers_to_github(servers_data):
     json_str = json.dumps(servers_data, indent=4)
     content_b64 = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
     payload = {
-        "message": "Auto-update servers.json from Render app",
+        "message": "Auto-update servers.json from app",
         "content": content_b64,
     }
     if sha:
@@ -138,13 +140,13 @@ def save_servers_to_github(servers_data):
 def load_servers():
     gh_servers = load_servers_from_github()
     if gh_servers and isinstance(gh_servers, dict):
-        with open(CONFIG_FILE, "w") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(gh_servers, f, indent=4)
         return gh_servers
 
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict):
                     return data
@@ -159,7 +161,7 @@ def load_servers():
     return default_servers
 
 def save_servers(servers):
-    with open(CONFIG_FILE, "w") as f:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(servers, f, indent=4)
     save_servers_to_github(servers)
 
@@ -223,38 +225,41 @@ def background_tracker():
             c_ita = conn_ita.cursor()
             c_gen = conn_gen.cursor()
 
-            for ip, cat, status, err in ping_results:
-                if ip not in SERVER_STATES:
-                    SERVER_STATES[ip] = {
-                        "ip": ip, "online": True, "players": 0, "max": 0,
-                        "version": "Inizializzazione...", "favicon": None, "fail_count": 0, "category": cat
-                    }
+            try:
+                for ip, cat, status, err in ping_results:
+                    if ip not in SERVER_STATES:
+                        SERVER_STATES[ip] = {
+                            "ip": ip, "online": True, "players": 0, "max": 0,
+                            "version": "Inizializzazione...", "favicon": None, "fail_count": 0, "category": cat
+                        }
 
-                state = SERVER_STATES[ip]
-                target_cursor = c_ita if cat == "italiani" else c_gen
+                    state = SERVER_STATES[ip]
+                    target_cursor = c_ita if cat == "italiani" else c_gen
 
-                if status is not None:
-                    players = getattr(status.players, "online", 0)
-                    max_p = getattr(status.players, "max", 0)
-                    version = status.version.name if hasattr(status, "version") and hasattr(status.version, "name") else "1.7.x - 1.21.x"
-                    favicon = getattr(status, "favicon", getattr(status, "icon", None))
+                    if status is not None:
+                        players = getattr(status.players, "online", 0)
+                        max_p = getattr(status.players, "max", 0)
+                        version = status.version.name if hasattr(status, "version") and hasattr(status.version, "name") else "1.7.x - 1.21.x"
+                        favicon = getattr(status, "favicon", getattr(status, "icon", None))
 
-                    state.update({"fail_count": 0, "online": True, "players": players, "max": max_p, "version": version})
-                    if favicon: state["favicon"] = favicon
+                        state.update({"fail_count": 0, "online": True, "players": players, "max": max_p, "version": version})
+                        if favicon: state["favicon"] = favicon
 
-                    target_cursor.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, now_ts, players, max_p))
-                    print(f"  🟢 {ip} ({cat}) -> ONLINE | Gioc: {players}/{max_p}")
-                else:
-                    state["fail_count"] += 1
-                    if state["fail_count"] >= MAX_FAILS or not state["online"]:
-                        state.update({"online": False, "players": 0, "version": "Non raggiungibile"})
-                    print(f"  🔴 {ip} ({cat}) -> OFFLINE ({state['fail_count']}/{MAX_FAILS}) | Err: {err}")
+                        target_cursor.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, now_ts, players, max_p))
+                        print(f"  🟢 {ip} ({cat}) -> ONLINE | Gioc: {players}/{max_p}")
+                    else:
+                        state["fail_count"] += 1
+                        if state["fail_count"] >= MAX_FAILS or not state["online"]:
+                            state.update({"online": False, "players": 0, "version": "Non raggiungibile"})
+                        print(f"  🔴 {ip} ({cat}) -> OFFLINE ({state['fail_count']}/{MAX_FAILS}) | Err: {err}")
 
-            # FONDAMENTALE: Esegue il commit e chiude le connessioni per salvare effettivamente su disco .db
-            conn_ita.commit()
-            conn_ita.close()
-            conn_gen.commit()
-            conn_gen.close()
+                conn_ita.commit()
+                conn_gen.commit()
+            except Exception as db_err:
+                print("❌ Errore durante il salvataggio dei dati nel background tracker:", db_err)
+            finally:
+                conn_ita.close()
+                conn_gen.close()
 
         time.sleep(PING_INTERVAL)
 
@@ -271,36 +276,38 @@ def safe_int_format(val):
 def get_server_analytics(ip, current_players, category):
     db_file = DB_ITA if category == "italiani" else DB_GEN
     now_ts = int(time.time())
+    
     conn = sqlite3.connect(db_file)
     c = conn.cursor()
+    try:
+        ts_72h = now_ts - (72 * 3600)
+        c.execute("SELECT MAX(players) FROM server_stats WHERE ip = ? AND timestamp >= ?", (ip, ts_72h))
+        row_72h = c.fetchone()
+        peak_val = row_72h[0] if row_72h and row_72h[0] is not None else current_players
 
-    ts_72h = now_ts - (72 * 3600)
-    c.execute("SELECT MAX(players) FROM server_stats WHERE ip = ? AND timestamp >= ?", (ip, ts_72h))
-    row_72h = c.fetchone()
-    peak_val = row_72h[0] if row_72h and row_72h[0] is not None else current_players
+        c.execute("SELECT players, timestamp FROM server_stats WHERE ip = ? ORDER BY players DESC LIMIT 1", (ip,))
+        row_rec = c.fetchone()
+        if row_rec and row_rec[0] is not None:
+            rec_players = row_rec[0]
+            try: rec_date = datetime.fromtimestamp(int(row_rec[1]), ITALY_TZ).strftime("%d/%m/%Y")
+            except: rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
+        else:
+            rec_players = current_players
+            rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
 
-    c.execute("SELECT players, timestamp FROM server_stats WHERE ip = ? ORDER BY players DESC LIMIT 1", (ip,))
-    row_rec = c.fetchone()
-    if row_rec and row_rec[0] is not None:
-        rec_players = row_rec[0]
-        try: rec_date = datetime.fromtimestamp(int(row_rec[1]), ITALY_TZ).strftime("%d/%m/%Y")
-        except: rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
-    else:
-        rec_players = current_players
-        rec_date = datetime.now(ITALY_TZ).strftime("%d/%m/%Y")
+        def get_past_players(seconds_ago):
+            target_ts = now_ts - seconds_ago
+            min_ts, max_ts = target_ts - 10800, target_ts + 10800
+            c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp BETWEEN ? AND ? ORDER BY ABS(timestamp - ?) ASC LIMIT 1", (ip, min_ts, max_ts, target_ts))
+            r = c.fetchone()
+            return safe_int_format(r[0]) if r and r[0] is not None else "-"
 
-    def get_past_players(seconds_ago):
-        target_ts = now_ts - seconds_ago
-        min_ts, max_ts = target_ts - 10800, target_ts + 10800
-        c.execute("SELECT players FROM server_stats WHERE ip = ? AND timestamp BETWEEN ? AND ? ORDER BY ABS(timestamp - ?) ASC LIMIT 1", (ip, min_ts, max_ts, target_ts))
-        r = c.fetchone()
-        return safe_int_format(r[0]) if r and r[0] is not None else "-"
-
-    p_1d, p_2d, p_3d = get_past_players(86400), get_past_players(2 * 86400), get_past_players(3 * 86400)
-    
-    c.execute("SELECT timestamp, players FROM server_stats WHERE ip = ? ORDER BY timestamp DESC LIMIT 25", (ip,))
-    rows_chart = c.fetchall()
-    conn.close()
+        p_1d, p_2d, p_3d = get_past_players(86400), get_past_players(2 * 86400), get_past_players(3 * 86400)
+        
+        c.execute("SELECT timestamp, players FROM server_stats WHERE ip = ? ORDER BY timestamp DESC LIMIT 25", (ip,))
+        rows_chart = c.fetchall()
+    finally:
+        conn.close()
 
     rows_chart.reverse()
     chart_labels = [datetime.fromtimestamp(r[0], ITALY_TZ).strftime("%H:%M:%S") for r in rows_chart]
@@ -379,10 +386,12 @@ def handle_servers(category):
                 }
                 db_file = DB_ITA if category == "italiani" else DB_GEN
                 conn = sqlite3.connect(db_file)
-                c = conn.cursor()
-                c.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, int(time.time()), players, max_p))
-                conn.commit()
-                conn.close()
+                try:
+                    c = conn.cursor()
+                    c.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, int(time.time()), players, max_p))
+                    conn.commit()
+                finally:
+                    conn.close()
 
             return jsonify({"status": "success", "servers": servers_data[category]})
         return jsonify({"status": "error", "message": "IP non valido o già presente"}), 400

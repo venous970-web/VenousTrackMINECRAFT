@@ -15,10 +15,9 @@ import requests
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-# Chiave segreta per le sessioni di login
 app.secret_key = os.environ.get("SECRET_KEY", "chiave-super-segreta-venous970")
 
-# --- PERCORSI ASSOLUTI (Risolve il problema del salvataggio file/db) ---
+# --- PERCORSI ASSOLUTI ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 DB_ITA = os.path.join(BASE_DIR, "venous_track_ita.db")
@@ -35,21 +34,85 @@ MAX_FAILS = 3
 PING_INTERVAL = 5
 ITALY_TZ = ZoneInfo("Europe/Rome")
 
-# --- GESTIONE UTENTI E PERMESSI ---
+# --- SINCRONIZZAZIONE GITHUB (DB E JSON) ---
+def download_file_from_github(filepath, filename):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    try:
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            content_b64 = res.json().get("content")
+            if content_b64:
+                with open(filepath, "wb") as f:
+                    f.write(base64.b64decode(content_b64))
+                print(f"📥 {filename} scaricato da GitHub con successo.")
+    except Exception as e:
+        print(f"⚠️ Impossibile scaricare {filename} da GitHub: {e}")
 
+def sync_file_to_github(filepath, filename):
+    if not GITHUB_TOKEN or not GITHUB_REPO:
+        return
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    
+    sha = None
+    try:
+        res = requests.get(url, headers=headers)
+        if res.status_code == 200:
+            sha = res.json().get("sha")
+    except:
+        pass
+
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, "rb") as f:
+                content_b64 = base64.b64encode(f.read()).decode("utf-8")
+                
+            payload = {
+                "message": f"Auto-backup {filename} da app",
+                "content": content_b64,
+            }
+            if sha:
+                payload["sha"] = sha
+                
+            res = requests.put(url, headers=headers, json=payload)
+            if res.status_code in [200, 201]:
+                print(f"✅ Backup di {filename} su GitHub completato.")
+    except Exception as e:
+        print(f"❌ Errore upload {filename}: {e}")
+
+def hourly_github_backup():
+    while True:
+        # Aspetta 60 minuti prima di fare il backup
+        time.sleep(3600)  
+        print("\n⏳ Avvio backup orario dei file su GitHub...")
+        sync_file_to_github(DB_ITA, "venous_track_ita.db")
+        sync_file_to_github(DB_GEN, "venous_track.db")
+        sync_file_to_github(CONFIG_FILE, "servers.json")
+
+# --- DOWNLOAD INIZIALE DEI DATI AL RIAVVIO DI RENDER ---
+print("🔄 Esecuzione download iniziale dei database da GitHub...")
+download_file_from_github(DB_ITA, "venous_track_ita.db")
+download_file_from_github(DB_GEN, "venous_track.db")
+
+# Avvia il thread di backup orario in background (non blocca l'interfaccia)
+backup_thread = threading.Thread(target=hourly_github_backup, daemon=True)
+backup_thread.start()
+
+# --- GESTIONE UTENTI E PERMESSI ---
 def init_users_file():
     if not os.path.exists(USERS_FILE):
         default_users = {
-            "Venous970": {
-                "add_italiano": True,
-                "add_generale": True,
-                "delete_server": True
-            },
-            "guest": {
-                "add_italiano": False,
-                "add_generale": True,
-                "delete_server": False
-            }
+            "Venous970": {"add_italiano": True, "add_generale": True, "delete_server": True},
+            "guest": {"add_italiano": False, "add_generale": True, "delete_server": False}
         }
         with open(USERS_FILE, "w", encoding="utf-8") as f:
             json.dump(default_users, f, indent=4)
@@ -65,7 +128,6 @@ def get_permissions(username):
         return {"add_italiano": False, "add_generale": True, "delete_server": False}
 
 # --- INIZIALIZZAZIONE DATABASE ---
-
 def init_db(db_file):
     conn = sqlite3.connect(db_file)
     c = conn.cursor()
@@ -84,66 +146,8 @@ def init_db(db_file):
 init_db(DB_ITA)
 init_db(DB_GEN)
 
-# --- GESTIONE GITHUB E SERVER ---
-
-def load_servers_from_github():
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return None
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/servers.json"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
-    try:
-        res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            content_b64 = res.json().get("content")
-            if content_b64:
-                decoded = base64.b64decode(content_b64).decode("utf-8")
-                data = json.loads(decoded)
-                if isinstance(data, list):
-                    return {"italiani": [], "generali": data}
-                return data
-    except Exception as e:
-        print("Errore caricamento da GitHub:", e)
-    return None
-
-def save_servers_to_github(servers_data):
-    if not GITHUB_TOKEN or not GITHUB_REPO:
-        return
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/servers.json"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-    }
-    sha = None
-    try:
-        res = requests.get(url, headers=headers)
-        if res.status_code == 200:
-            sha = res.json().get("sha")
-    except Exception:
-        pass
-
-    json_str = json.dumps(servers_data, indent=4)
-    content_b64 = base64.b64encode(json_str.encode("utf-8")).decode("utf-8")
-    payload = {
-        "message": "Auto-update servers.json from app",
-        "content": content_b64,
-    }
-    if sha:
-        payload["sha"] = sha
-    try:
-        requests.put(url, headers=headers, json=payload)
-    except Exception as e:
-        print("Errore salvataggio su GitHub:", e)
-
+# --- CARICAMENTO SERVER ---
 def load_servers():
-    gh_servers = load_servers_from_github()
-    if gh_servers and isinstance(gh_servers, dict):
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(gh_servers, f, indent=4)
-        return gh_servers
-
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -157,18 +161,13 @@ def load_servers():
         "italiani": ["venous.coralmc.it", "play.metamc.it", "play.tecnocraft.net", "play.scarletmc.it"],
         "generali": ["hypixel.net", "donutsmp.net"]
     }
-    save_servers(default_servers)
-    return default_servers
-
-def save_servers(servers):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(servers, f, indent=4)
-    save_servers_to_github(servers)
+        json.dump(default_servers, f, indent=4)
+    return default_servers
 
 servers_data = load_servers()
 
 # --- TRACKER DI BACKGROUND ---
-
 def query_minecraft_server(ip):
     if ":" in ip:
         try:
@@ -199,14 +198,11 @@ def query_minecraft_server(ip):
 def background_tracker():
     while True:
         now_ts = int(time.time())
-        all_servers = []
-        for cat in ["italiani", "generali"]:
-            for ip in servers_data.get(cat, []):
-                all_servers.append((ip, cat))
+        all_servers = [(ip, cat) for cat in ["italiani", "generali"] for ip in servers_data.get(cat, [])]
 
         if all_servers:
             time_str = datetime.now(ITALY_TZ).strftime("%H:%M:%S")
-            print(f"\n🔄 [{time_str}] Avvio ping PARALLELO per {len(all_servers)} server...")
+            print(f"\n🔄 [{time_str}] Avvio ping per {len(all_servers)} server...")
             start_t = time.time()
             ping_results = []
             
@@ -216,9 +212,6 @@ def background_tracker():
                     ip, cat = futures[future]
                     status, err = future.result()
                     ping_results.append((ip, cat, status, err))
-
-            elapsed = round(time.time() - start_t, 2)
-            print(f"⏱️ Controllati {len(all_servers)} server in simultanea ({elapsed}s)")
 
             conn_ita = sqlite3.connect(DB_ITA)
             conn_gen = sqlite3.connect(DB_GEN)
@@ -246,17 +239,15 @@ def background_tracker():
                         if favicon: state["favicon"] = favicon
 
                         target_cursor.execute("INSERT INTO server_stats VALUES (?, ?, ?, ?)", (ip, now_ts, players, max_p))
-                        print(f"  🟢 {ip} ({cat}) -> ONLINE | Gioc: {players}/{max_p}")
                     else:
                         state["fail_count"] += 1
                         if state["fail_count"] >= MAX_FAILS or not state["online"]:
                             state.update({"online": False, "players": 0, "version": "Non raggiungibile"})
-                        print(f"  🔴 {ip} ({cat}) -> OFFLINE ({state['fail_count']}/{MAX_FAILS}) | Err: {err}")
 
                 conn_ita.commit()
                 conn_gen.commit()
             except Exception as db_err:
-                print("❌ Errore durante il salvataggio dei dati nel background tracker:", db_err)
+                print("❌ Errore tracker:", db_err)
             finally:
                 conn_ita.close()
                 conn_gen.close()
@@ -267,7 +258,6 @@ tracking_thread = threading.Thread(target=background_tracker, daemon=True)
 tracking_thread.start()
 
 # --- ANALYTICS ---
-
 def safe_int_format(val):
     if val is None: return "-"
     try: return f"{int(val):,}".replace(",", ".")
@@ -323,7 +313,6 @@ def get_server_analytics(ip, current_players, category):
     }
 
 # --- ROTTE API ---
-
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -361,7 +350,7 @@ def handle_servers(category):
 
     if request.method == "POST":
         if (category == "italiani" and not perms["add_italiano"]) or (category == "generali" and not perms["add_generale"]):
-            return jsonify({"status": "error", "message": "Non hai i permessi per aggiungere in questa categoria"}), 403
+            return jsonify({"status": "error", "message": "Non hai i permessi per aggiungere"}), 403
 
         data = request.json or {}
         ip = data.get("ip", "").strip()
@@ -372,7 +361,7 @@ def handle_servers(category):
                 servers_data[other_cat].remove(ip)
                 
             servers_data[category].append(ip)
-            save_servers(servers_data)
+            sync_file_to_github(CONFIG_FILE, "servers.json") # Sync immediato configurazione
             
             status, _ = query_minecraft_server(ip)
             if status is not None:
@@ -398,17 +387,17 @@ def handle_servers(category):
     
     elif request.method == "DELETE":
         if not perms["delete_server"]:
-            return jsonify({"status": "error", "message": "Non hai i permessi per eliminare i server"}), 403
+            return jsonify({"status": "error", "message": "Non hai i permessi"}), 403
 
         data = request.json or {}
         ip = data.get("ip", "").strip()
         if ip in servers_data[category]:
             servers_data[category].remove(ip)
-            save_servers(servers_data)
+            sync_file_to_github(CONFIG_FILE, "servers.json")
             if ip in SERVER_STATES:
                 del SERVER_STATES[ip]
             return jsonify({"status": "success", "servers": servers_data[category]})
-        return jsonify({"status": "error", "message": "IP non trovato nella lista"}), 404
+        return jsonify({"status": "error", "message": "IP non trovato"}), 404
 
     return jsonify(servers_data[category])
 

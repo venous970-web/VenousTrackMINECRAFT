@@ -101,7 +101,7 @@ def sync_file_to_github(filepath, filename):
 def hourly_github_backup():
     while True:
         # Aspetta 60 minuti prima di fare il backup
-        time.sleep(3600)  
+        time.sleep(1800)  
         print("\n⏳ Avvio backup orario dei file su GitHub...")
         sync_file_to_github(DB_ITA, "venous_track_ita.db")
         sync_file_to_github(DB_GEN, "venous_track.db")
